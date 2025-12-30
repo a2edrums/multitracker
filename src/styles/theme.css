@@ -1,0 +1,87 @@
+:root {
+  --bs-dark: #121212;
+  --bs-dark-rgb: 18, 18, 18;
+  --bs-body-bg: #1a1a1a;
+  --bs-body-color: #e0e0e0;
+  --bs-border-color: #333;
+  --bs-secondary: #404040;
+  --bs-primary: #0d6efd;
+  --bs-success: #198754;
+  --bs-danger: #dc3545;
+  --bs-warning: #ffc107;
+  
+  /* Studio specific colors */
+  --studio-bg: #1a1a1a;
+  --studio-panel: #2d2d2d;
+  --studio-border: #404040;
+  --studio-text: #e0e0e0;
+  --studio-text-muted: #b0b0b0;
+  --studio-accent: #0d6efd;
+  --studio-record: #dc3545;
+  --studio-play: #198754;
+  --studio-track: #333;
+  --studio-waveform: #0d6efd;
+}
+
+body {
+  background-color: var(--studio-bg);
+  color: var(--studio-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.studio-panel {
+  background-color: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 4px;
+}
+
+.studio-button {
+  background-color: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  color: var(--studio-text);
+  transition: all 0.2s;
+}
+
+.studio-button:hover {
+  background-color: var(--studio-border);
+  color: var(--studio-text);
+}
+
+.studio-button.active {
+  background-color: var(--studio-accent);
+  border-color: var(--studio-accent);
+}
+
+.studio-slider {
+  background-color: var(--studio-border);
+}
+
+.studio-track {
+  background-color: var(--studio-track);
+  border: 1px solid var(--studio-border);
+  margin-bottom: 2px;
+}
+
+.studio-timeline {
+  background-color: var(--studio-panel);
+  border-bottom: 1px solid var(--studio-border);
+}
+
+.studio-transport {
+  background-color: var(--studio-panel);
+  border-top: 1px solid var(--studio-border);
+  padding: 10px;
+}
+
+.btn-record {
+  background-color: var(--studio-record);
+  border-color: var(--studio-record);
+}
+
+.btn-play {
+  background-color: var(--studio-play);
+  border-color: var(--studio-play);
+}
+.text-muted {
+  color: var(--studio-text-muted) !important;
+}

@@ -1,0 +1,22 @@
+export const AUDIO_CONFIG = {
+  SAMPLE_RATE: 44100,
+  BUFFER_SIZE: 4096,
+  MAX_TRACKS: 32,
+  DEFAULT_BPM: 120,
+  DEFAULT_TIME_SIGNATURE: [4, 4]
+};
+
+export const UI_CONFIG = {
+  TIMELINE_HEIGHT: 60,
+  TRACK_HEIGHT: 80,
+  MIXER_WIDTH: 300,
+  ZOOM_LEVELS: [0.1, 0.25, 0.5, 1, 2, 4, 8]
+};
+
+export const KEYBOARD_SHORTCUTS = {
+  PLAY_PAUSE: ' ',
+  STOP: 'Escape',
+  RECORD: 'r',
+  UNDO: 'z',
+  REDO: 'y'
+};

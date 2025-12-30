@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multitracker-deployment
+  labels:
+    app: multitracker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multitracker
+  template:
+    metadata:
+      labels:
+        app: multitracker
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+        - name: multitracker
+          image: matt404/multitracker:IMAGE_VERSION
+          ports:
+            - containerPort: 80
+              protocol: TCP
