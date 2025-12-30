@@ -1,70 +1,178 @@
-# Getting Started with Create React App
+# MultiTracker Studio
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A professional-grade, web-based audio multi-tracking studio built with React and Web Audio API. Record, edit, mix, and export audio entirely in your browser with no backend required.
 
-## Available Scripts
+## 🎵 Features
 
-In the project directory, you can run:
+### Core Audio Engine
+- **Multi-track recording** from microphone with real-time monitoring
+- **Professional transport controls** (Play, Pause, Stop, Record)
+- **High-quality audio processing** using Web Audio API
+- **Low-latency recording** optimized for real-time performance
+- **Automatic audio context initialization** on user interaction
 
-### `npm start`
+### Track Management
+- **Unlimited audio tracks** with individual controls
+- **Track arming system** - arm tracks for recording, then hit record
+- **Individual volume controls** with real-time adjustment
+- **Mute/Solo functionality** for each track
+- **Track naming** with automatic saving
+- **Visual waveform display** showing actual audio data
+- **Real-time playhead** during playback
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Professional Timeline
+- **Interactive timeline** with click-to-seek functionality
+- **Zoom controls** (0.25x to 8x magnification)
+- **Time ruler** with major/minor tick marks
+- **Visual playhead cursor** synchronized with audio
+- **Dynamic duration** based on longest track
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### Built-in Effects
+- **3-band parametric EQ** per track
+  - Low shelf filter (80Hz)
+  - Mid peaking filter (1kHz) 
+  - High shelf filter (8kHz)
+- **Real-time parameter adjustment** with ±12dB range
+- **Visual EQ controls** with collapsible panels
 
-### `npm test`
+### Metronome & Timing
+- **Built-in metronome** with adjustable BPM (60-200)
+- **Click track generation** using precise audio scheduling
+- **Visual metronome controls** in transport bar
+- **Independent operation** from playback
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### File Management
+- **Audio file import** (WAV, MP3, OGG, WebM formats)
+- **Drag-and-drop ready** file selection
+- **WAV export** of individual tracks
+- **Automatic project saving** to IndexedDB
+- **Persistent storage** of all track data and audio
 
-### `npm run build`
+### Professional UI
+- **Dark theme** optimized for studio environments
+- **Bootstrap-based** responsive design
+- **Professional layout** with organized control sections
+- **Visual feedback** for all operations
+- **Keyboard shortcuts** ready architecture
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 🚀 Getting Started
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Prerequisites
+- Modern web browser with Web Audio API support
+- Microphone access for recording
+- Speakers/headphones for playback
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Installation
 
-### `npm run eject`
+```bash
+# Clone the repository
+git clone <repository-url>
+cd multitracker
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+# Install dependencies
+npm install
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+# Start development server
+npm start
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+# Build for production
+npm run build
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Usage
 
-## Learn More
+1. **Add Tracks**: Click "Add Track" to create new audio tracks
+2. **Import Audio**: Use "Import" to load existing audio files
+3. **Record Audio**: 
+   - Click the microphone button on a track to arm it
+   - Click the record button in transport controls to start recording
+4. **Mix**: Adjust volume, use mute/solo, and apply EQ effects
+5. **Timeline**: Use zoom controls and click timeline to navigate
+6. **Export**: Save your work using the "Export" button
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## 🛠️ Technical Architecture
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Core Technologies
+- **React 19.2.3** - Modern UI framework
+- **Web Audio API** - Professional audio processing
+- **IndexedDB** - Local data persistence
+- **Bootstrap 5** - UI components and styling
+- **Canvas API** - Waveform visualization
 
-### Code Splitting
+### Audio Processing
+- **AudioContext** management with automatic initialization
+- **Real-time audio routing** through gain nodes
+- **Biquad filters** for EQ processing
+- **MediaRecorder API** for microphone recording
+- **AudioBuffer** management for playback
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Data Persistence
+- **Project metadata** stored in IndexedDB projects store
+- **Audio recordings** stored as blobs in audioBlobs store
+- **Settings persistence** for user preferences
+- **Automatic saving** on all track modifications
 
-### Analyzing the Bundle Size
+### Performance Optimizations
+- **Canvas rendering** with device pixel ratio support
+- **Efficient waveform drawing** with data decimation
+- **Memory management** for audio buffers
+- **Responsive UI updates** with React hooks
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## 🎛️ Professional Workflow
 
-### Making a Progressive Web App
+### Recording Workflow
+1. Add tracks for your instruments/vocals
+2. Arm the track you want to record to (red microphone button)
+3. Set up your levels and monitoring
+4. Hit the main Record button to start recording
+5. Use Stop button to end recording or playback
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### Mixing Workflow
+1. Import or record your audio tracks
+2. Use individual track volume controls for balance
+3. Apply EQ to shape the sound of each track
+4. Use mute/solo to isolate tracks during mixing
+5. Export your final mix
 
-### Advanced Configuration
+## 🔧 Browser Compatibility
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- **Chrome/Edge**: Full support with optimal performance
+- **Firefox**: Good support with minor limitations
+- **Safari**: Basic support, some iOS limitations
+- **Mobile**: Limited due to Web Audio API constraints
 
-### Deployment
+## 📊 Performance Targets
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- **Audio Latency**: < 10ms for recording
+- **UI Rendering**: 60fps timeline and waveforms
+- **Memory Usage**: < 100MB for typical projects
+- **Track Support**: 16+ simultaneous tracks
+- **File Size**: ~80KB gzipped bundle
 
-### `npm run build` fails to minify
+## 🔒 Privacy & Security
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- **100% client-side** - no data sent to servers
+- **Local storage only** - all data stays on your device
+- **Microphone permission** - requested only when needed
+- **No tracking** - completely private audio production
+
+## 🎯 Future Roadmap
+
+- **Advanced effects** (reverb, delay, compressor)
+- **MIDI support** for virtual instruments
+- **Audio editing tools** (cut, copy, paste, fade)
+- **Plugin architecture** for third-party effects
+- **Collaboration features** for sharing projects
+- **Advanced mixing** (sends, returns, buses)
+
+## 📝 License
+
+This project is licensed under the MIT License.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
+
+---
+
+**MultiTracker Studio** - Professional audio production in your browser 🎵
