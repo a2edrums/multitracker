@@ -6,6 +6,7 @@ const WaveformDisplay = ({
   height = 60,
   currentTime = 0,
   duration = 0,
+  zoom = 1,
   color = '#0d6efd'
 }) => {
   const canvasRef = useRef(null);
@@ -33,25 +34,41 @@ const WaveformDisplay = ({
     
     // Draw playhead if playing
     if (currentTime > 0 && duration > 0) {
-      drawPlayhead(ctx, actualWidth, height, currentTime, duration);
+      drawPlayhead(ctx, actualWidth, height, currentTime, duration, zoom);
     }
-  }, [audioBuffer, width, height, currentTime, duration, color]);
+  }, [audioBuffer, width, height, currentTime, duration, color, zoom]);
 
   const drawWaveform = (ctx, buffer, canvasWidth, canvasHeight, waveColor) => {
     const data = buffer.getChannelData(0); // Use first channel
-    const step = Math.ceil(data.length / canvasWidth);
+    const sampleRate = buffer.sampleRate;
+    const bufferDuration = buffer.length / sampleRate;
+    
+    // Calculate visible duration based on zoom
+    const visibleDuration = duration / zoom;
+    
+    // Calculate how much of the canvas width this audio should occupy
+    const audioWidthRatio = bufferDuration / visibleDuration;
+    const audioPixelWidth = canvasWidth * audioWidthRatio;
+    
+    // Only draw if the audio is visible in the current view
+    if (audioPixelWidth < 1) return;
+    
+    const samplesPerPixel = data.length / audioPixelWidth;
     const amp = canvasHeight / 2;
     
     ctx.strokeStyle = waveColor;
     ctx.lineWidth = 1;
     ctx.beginPath();
     
-    for (let i = 0; i < canvasWidth; i++) {
+    for (let i = 0; i < audioPixelWidth && i < canvasWidth; i++) {
       let min = 1.0;
       let max = -1.0;
       
-      for (let j = 0; j < step; j++) {
-        const datum = data[(i * step) + j];
+      const startSample = Math.floor(i * samplesPerPixel);
+      const endSample = Math.floor((i + 1) * samplesPerPixel);
+      
+      for (let j = startSample; j < endSample && j < data.length; j++) {
+        const datum = data[j];
         if (datum < min) min = datum;
         if (datum > max) max = datum;
       }
@@ -80,8 +97,9 @@ const WaveformDisplay = ({
     ctx.globalAlpha = 1.0;
   };
 
-  const drawPlayhead = (ctx, canvasWidth, canvasHeight, time, totalDuration) => {
-    const x = (time / totalDuration) * canvasWidth;
+  const drawPlayhead = (ctx, canvasWidth, canvasHeight, time, totalDuration, zoomLevel = 1) => {
+    const visibleDuration = totalDuration / zoomLevel;
+    const x = (time / visibleDuration) * canvasWidth;
     
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1;

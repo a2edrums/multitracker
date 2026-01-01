@@ -10,6 +10,7 @@ import { useMetronome } from './hooks/useMetronome.js';
 import TransportControls from './components/transport/TransportControls.js';
 import Timeline from './components/transport/Timeline.js';
 import Track from './components/tracks/Track.js';
+import VUMeter from './components/common/VUMeter.js';
 import FileService from './services/FileService.js';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -18,7 +19,7 @@ import './styles/theme.css';
 function App() {
   const { isInitialized, needsUserActivation, initializeAudio, isPlaying, currentTime, play, pause, stop, audioEngine } = useAudioContext();
   const { isReady, db } = useIndexedDB();
-  const { isRecording, startRecording, stopRecording, convertBlobToAudioBuffer, recordedBlob } = useAudioRecording(audioEngine.context);
+  const { isRecording, startRecording, stopRecording, convertBlobToAudioBuffer, recordedBlob, inputNode, setRecordedBlob } = useAudioRecording(audioEngine.context);
   const { isMetronomeOn, bpm, setBpm, toggleMetronome } = useMetronome(audioEngine.context);
   const [tracks, setTracks] = useState([]);
   const [recordingTrackId, setRecordingTrackId] = useState(null);
@@ -49,15 +50,61 @@ function App() {
     if (isReady) {
       db.loadProject(currentProjectId).then(project => {
         if (project && project.tracks) {
+          console.log('Loaded project tracks:', project.tracks);
           setTracks(project.tracks);
-          // Recreate audio engine tracks
-          project.tracks.forEach(track => {
-            audioEngine.createTrack(track.id);
-          });
+          // Recreate audio engine tracks - but only if audio engine is initialized
+          if (audioEngine.context) {
+            project.tracks.forEach(track => {
+              audioEngine.createTrack(track.id);
+            });
+          }
         }
       });
     }
   }, [isReady, db, currentProjectId, audioEngine]);
+
+  // Create audio engine tracks when audio context becomes available
+  React.useEffect(() => {
+    if (audioEngine.context && tracks.length > 0) {
+      tracks.forEach(track => {
+        if (!audioEngine.tracks.has(track.id)) {
+          audioEngine.createTrack(track.id);
+        }
+      });
+    }
+  }, [audioEngine.context, tracks, audioEngine]);
+
+  // Load audio blobs for existing tracks
+  React.useEffect(() => {
+    if (isReady) {
+      console.log('Loading audio for tracks:', tracks.filter(t => t.hasAudio && !t.buffer));
+      tracks.forEach(async track => {
+        if (track.hasAudio && !track.buffer) {
+          console.log('Loading audio for track:', track.id);
+          try {
+            const blob = await db.loadAudioBlob(track.id);
+            console.log('Loaded blob for track:', track.id, blob ? blob.size : 'null');
+            if (blob && convertBlobToAudioBuffer) {
+              const audioBuffer = await convertBlobToAudioBuffer(blob);
+              console.log('Converted to audio buffer:', track.id, audioBuffer ? audioBuffer.duration : 'null');
+              if (audioBuffer) {
+                const engineTrack = audioEngine.tracks.get(track.id);
+                if (engineTrack) {
+                  engineTrack.buffer = audioBuffer;
+                }
+                setTracks(prev => prev.map(t => 
+                  t.id === track.id ? { ...t, buffer: audioBuffer } : t
+                ));
+                console.log('Updated track with audio buffer:', track.id);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to load audio for track:', track.id, error);
+          }
+        }
+      });
+    }
+  }, [tracks, isReady, db, audioEngine, convertBlobToAudioBuffer]);
 
   // Update project duration based on longest track
   React.useEffect(() => {
@@ -162,25 +209,33 @@ function App() {
   const handleStop = useCallback(() => {
     if (isRecording) {
       stopRecording();
-      setRecordingTrackId(null);
+      // Don't clear recordingTrackId here - let the audio processing useEffect handle it
     }
     stop();
   }, [isRecording, stopRecording, stop]);
 
   const handleRecord = useCallback(async () => {
+    console.log('Record button clicked, isRecording:', isRecording, 'armedTrackId:', armedTrackId);
     if (!isInitialized) {
       await initializeAudio();
     }
     
     if (isRecording) {
+      console.log('Stopping recording');
       stopRecording();
-      setRecordingTrackId(null);
+      // Don't clear recordingTrackId here - let the audio processing useEffect handle it
     } else {
       if (armedTrackId) {
+        console.log('Starting recording on track:', armedTrackId);
         const success = await startRecording();
         if (success) {
           setRecordingTrackId(armedTrackId);
+          console.log('Recording started successfully');
+        } else {
+          console.error('Failed to start recording');
         }
+      } else {
+        console.log('No track armed for recording');
       }
     }
   }, [isRecording, startRecording, stopRecording, isInitialized, initializeAudio, armedTrackId]);
@@ -188,21 +243,35 @@ function App() {
   // Handle recorded audio
   React.useEffect(() => {
     if (recordedBlob && recordingTrackId) {
+      console.log('Processing recorded audio for track:', recordingTrackId, 'blob size:', recordedBlob.size);
       convertBlobToAudioBuffer(recordedBlob).then(async audioBuffer => {
         if (audioBuffer) {
+          console.log('Audio buffer created, duration:', audioBuffer.duration, 'channels:', audioBuffer.numberOfChannels);
           const track = audioEngine.tracks.get(recordingTrackId);
           if (track) {
             track.buffer = audioBuffer;
             // Save audio blob to IndexedDB
             await db.saveAudioBlob(recordingTrackId, recordedBlob);
             setTracks(prev => prev.map(t => 
-              t.id === recordingTrackId ? { ...t, buffer: audioBuffer } : t
+              t.id === recordingTrackId ? { ...t, buffer: audioBuffer, hasAudio: true } : t
             ));
+            console.log('Track updated with audio buffer');
+          } else {
+            console.error('Track not found in audio engine:', recordingTrackId);
           }
+        } else {
+          console.error('Failed to create audio buffer from blob');
         }
+        // Clear the recorded blob and recording track ID after processing
+        setRecordedBlob(null);
+        setRecordingTrackId(null);
+      }).catch(error => {
+        console.error('Error processing recorded audio:', error);
+        setRecordedBlob(null);
+        setRecordingTrackId(null);
       });
     }
-  }, [recordedBlob, recordingTrackId, audioEngine, convertBlobToAudioBuffer, db]);
+  }, [recordedBlob, recordingTrackId, audioEngine, convertBlobToAudioBuffer, db, setRecordedBlob]);
 
   const handleFileImport = useCallback(() => {
     const input = FileService.createFileInput(async (file) => {
@@ -215,7 +284,8 @@ function App() {
           volume: 1,
           muted: false,
           solo: false,
-          buffer: audioBuffer
+          buffer: audioBuffer,
+          hasAudio: true
         };
         
         const engineTrack = audioEngine.createTrack(trackId);
@@ -259,19 +329,6 @@ function App() {
     );
   }
 
-  if (!isInitialized) {
-    return (
-      <div className="d-flex justify-content-center align-items-center vh-100">
-        <div className="text-center">
-          <div className="spinner-border text-primary mb-3" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p>Initializing Audio System...</p>
-        </div>
-      </div>
-    );
-  }
-
   if (!isReady) {
     return (
       <div className="d-flex justify-content-center align-items-center vh-100">
@@ -303,6 +360,14 @@ function App() {
           </div>
           
           <div className="d-flex align-items-center gap-3">
+            <div className="master-vu">
+              <VUMeter 
+                key={`master-vu-${tracks.length}`}
+                audioNode={audioEngine?.masterVUGain}
+                width={30}
+                height={40}
+              />
+            </div>
             <label className="form-label mb-0">Master Volume:</label>
             <input 
               type="range" 
@@ -321,7 +386,7 @@ function App() {
           <Col className="d-flex flex-column">
             {/* Timeline Area */}
             <div className="d-flex">
-              <div style={{ minWidth: '255px' }}></div>
+              <div style={{ minWidth: '286px' }}></div>
               <div className="flex-grow-1 ms-3">
                 <Timeline 
                   currentTime={currentTime}
@@ -354,6 +419,10 @@ function App() {
                   isRecording={isRecording && recordingTrackId === track.id}
                   isArmed={armedTrackId === track.id}
                   currentTime={currentTime}
+                  audioEngine={audioEngine}
+                  inputNode={isRecording && recordingTrackId === track.id ? inputNode : null}
+                  zoom={zoom}
+                  projectDuration={projectDuration}
                 />
               ))}
               

@@ -20,7 +20,9 @@ class AudioEngine {
       });
       
       this.masterGain = this.context.createGain();
-      this.masterGain.connect(this.context.destination);
+      this.masterVUGain = this.context.createGain(); // For master VU meter
+      this.masterGain.connect(this.masterVUGain);
+      this.masterVUGain.connect(this.context.destination);
       
       this.effects = new AudioEffects(this.context);
       
@@ -49,16 +51,19 @@ class AudioEngine {
     }
     
     const trackGain = this.context.createGain();
-    const eqNode = this.context.createGain(); // Placeholder for EQ chain
+    const eqNode = this.context.createGain();
+    const vuGain = this.context.createGain(); // For VU meter
     
     // Create EQ for this track
     const eq = this.effects.createEQ(trackGain, eqNode);
-    eqNode.connect(this.masterGain);
+    eqNode.connect(vuGain);
+    vuGain.connect(this.masterGain);
     
     const track = {
       id,
       gainNode: trackGain,
       eqNode,
+      vuGain, // VU meter tap
       eq,
       source: null,
       buffer: null,
@@ -84,6 +89,8 @@ class AudioEngine {
         track.source.disconnect();
       }
       track.gainNode.disconnect();
+      track.eqNode.disconnect();
+      track.vuGain.disconnect();
       this.tracks.delete(id);
     }
   }
@@ -123,6 +130,7 @@ class AudioEngine {
   }
 
   getCurrentTime() {
+    if (!this.context) return 0;
     if (this.isPlaying) {
       return this.currentTime + (this.context.currentTime - this.startTime);
     }
@@ -130,7 +138,11 @@ class AudioEngine {
   }
 
   play() {
-    if (!this.isPlaying) {
+    if (!this.context || !this.isPlaying) {
+      if (!this.context) {
+        console.error('Cannot play: audio context not initialized');
+        return;
+      }
       this.isPlaying = true;
       this.startTime = this.context.currentTime;
       this.playAllTracks();

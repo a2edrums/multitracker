@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button, Form, Collapse } from 'react-bootstrap';
 import { FaVolumeUp, FaMicrophone, FaTrash, FaSlidersH } from 'react-icons/fa';
 import WaveformDisplay from './WaveformDisplay.js';
+import VUMeter from '../common/VUMeter.js';
 import EQ from '../effects/EQ.js';
 
 const Track = ({ 
@@ -15,9 +16,18 @@ const Track = ({
   onEQChange,
   isRecording = false,
   isArmed = false,
-  currentTime = 0
+  currentTime = 0,
+  audioEngine,
+  inputNode,
+  zoom = 1,
+  projectDuration = 60
 }) => {
   const [showEQ, setShowEQ] = useState(false);
+  
+  const vuAudioNode = React.useMemo(() => {
+    return inputNode || audioEngine?.tracks?.get(track.id)?.vuGain;
+  }, [inputNode, audioEngine, track.id]);
+  
   return (
     <div className="studio-track">
       <div className="d-flex align-items-center p-2">
@@ -44,6 +54,15 @@ const Track = ({
                     e.target.blur();
                   }
                 }}
+              />
+            </div>
+            
+            <div className="vu-meter ms-2">
+              <VUMeter 
+                key={`${track.id}-${isRecording ? 'recording' : 'playback'}`}
+                audioNode={vuAudioNode}
+                width={20}
+                height={30}
               />
             </div>
           </div>
@@ -101,14 +120,15 @@ const Track = ({
               <div className="spinner-grow spinner-grow-sm me-2" role="status"></div>
               Recording...
             </div>
-          ) : track.buffer ? (
+          ) : (track.buffer && track.hasAudio) || track.buffer ? (
             <div className="flex-grow-1" style={{ height: '60px' }}>
               <WaveformDisplay 
                 audioBuffer={track.buffer}
                 width={600}
                 height={60}
                 currentTime={currentTime}
-                duration={track.buffer.duration}
+                duration={track.buffer ? track.buffer.duration : projectDuration}
+                zoom={zoom}
                 color="#0d6efd"
               />
             </div>

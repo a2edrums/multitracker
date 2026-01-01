@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import AudioEngine from '../services/AudioEngine.js';
 
 export const useAudioContext = () => {
-  const [isInitialized, setIsInitialized] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [needsUserActivation, setNeedsUserActivation] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
