@@ -3,12 +3,14 @@ import React, { useRef, useEffect } from 'react';
 const VUMeter = ({ 
   audioNode, 
   width = 20, 
-  height = 60, 
+  height = 60,
   orientation = 'vertical' 
 }) => {
   const canvasRef = useRef(null);
   const analyserRef = useRef(null);
   const animationRef = useRef(null);
+  const peakRef = useRef(0);
+  const peakHoldTimeRef = useRef(0);
 
   useEffect(() => {
     if (!audioNode || !audioNode.context) return;
@@ -31,7 +33,7 @@ const VUMeter = ({
     const ctx = canvas.getContext('2d');
     const analyser = audioNode.context.createAnalyser();
     analyser.fftSize = 256;
-    analyser.smoothingTimeConstant = 0.8;
+    analyser.smoothingTimeConstant = 0.3;
     
     audioNode.connect(analyser);
     analyserRef.current = analyser;
@@ -42,14 +44,25 @@ const VUMeter = ({
     const draw = () => {
       if (!active) return;
       
-      analyser.getByteFrequencyData(dataArray);
+      analyser.getByteTimeDomainData(dataArray);
       
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) {
-        sum += dataArray[i] * dataArray[i];
+        const sample = (dataArray[i] - 128) / 128;
+        sum += sample * sample;
       }
       const rms = Math.sqrt(sum / dataArray.length);
-      const level = rms / 255;
+      const level = Math.min(rms * 3, 1); // Amplify and clamp
+
+      // Peak hold logic
+      const currentTime = Date.now();
+      if (level > peakRef.current) {
+        peakRef.current = level;
+        peakHoldTimeRef.current = currentTime + 1000; // Hold for 1 second
+      } else if (currentTime > peakHoldTimeRef.current) {
+        peakRef.current *= 0.95; // Gradual decay
+        if (peakRef.current < 0.01) peakRef.current = 0; // Clear when very low
+      }
 
       ctx.fillStyle = '#1a1a1a';
       ctx.fillRect(0, 0, width, height);
@@ -62,6 +75,13 @@ const VUMeter = ({
       
       ctx.fillStyle = gradient;
       ctx.fillRect(2, height - barHeight, width - 4, barHeight);
+      
+      // Draw peak indicator
+      if (peakRef.current > 0) {
+        const peakY = height - (peakRef.current * height);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(1, peakY - 1, width - 2, 2);
+      }
       
       animationRef.current = requestAnimationFrame(draw);
     };

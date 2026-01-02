@@ -404,7 +404,7 @@ function App() {
             </div>
             
             {/* Tracks Area */}
-            <div className="tracks-container flex-grow-1 overflow-auto p-2">
+            <div className="tracks-container flex-grow-1 overflow-auto p-2" style={{ marginTop: '10px' }}>
               {tracks.map(track => (
                 <Track
                   key={track.id}

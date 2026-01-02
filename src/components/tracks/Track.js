@@ -30,87 +30,89 @@ const Track = ({
   
   return (
     <div className="studio-track">
-      <div className="d-flex align-items-center p-2">
-        <div className="track-controls" style={{ minWidth: '200px' }}>
-          <div className="d-flex align-items-center mb-2">
-            <Button
-              variant={isArmed ? 'danger' : isRecording ? 'danger' : 'outline-danger'}
-              size="sm"
-              className="me-2"
-              onClick={() => onRecord(track.id)}
-            >
-              <FaMicrophone className={isArmed || isRecording ? 'text-white' : ''} />
-            </Button>
-            
-            <div className="track-name flex-grow-1">
-              <Form.Control
-                type="text"
+      <div className="d-flex align-items-stretch p-2">
+        <div className="track-controls d-flex" style={{ minWidth: '200px' }}>
+          <div className="flex-grow-1">
+            <div className="d-flex align-items-center mb-2">
+              <Button
+                variant={isArmed ? 'danger' : isRecording ? 'danger' : 'outline-danger'}
                 size="sm"
-                defaultValue={track.name || `Track ${track.id}`}
-                className="bg-dark text-light border-secondary"
-                onBlur={(e) => onNameChange(track.id, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.target.blur();
-                  }
-                }}
+                className="me-2"
+                onClick={() => onRecord(track.id)}
+              >
+                <FaMicrophone className={isArmed || isRecording ? 'text-white' : ''} />
+              </Button>
+              
+              <div className="track-name flex-grow-1">
+                <Form.Control
+                  type="text"
+                  size="sm"
+                  defaultValue={track.name || `Track ${track.id}`}
+                  className="bg-dark text-light border-secondary"
+                  onBlur={(e) => onNameChange(track.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.target.blur();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            
+            <div className="volume-control d-flex align-items-center mb-2">
+              <FaVolumeUp className="me-2" />
+              <Form.Range
+                min={0}
+                max={1}
+                step={0.01}
+                value={track.volume || 1}
+                onChange={(e) => onVolumeChange(track.id, parseFloat(e.target.value))}
+                style={{ width: '100px' }}
               />
             </div>
             
-            <div className="vu-meter ms-2">
-              <VUMeter 
-                key={`${track.id}-${isRecording ? 'recording' : 'playback'}`}
-                audioNode={vuAudioNode}
-                width={20}
-                height={30}
-              />
+            <div className="d-flex gap-1">
+              <Button
+                variant={track.muted ? 'warning' : 'outline-secondary'}
+                size="sm"
+                onClick={() => onMute(track.id)}
+              >
+                M
+              </Button>
+              
+              <Button
+                variant={track.solo ? 'success' : 'outline-secondary'}
+                size="sm"
+                onClick={() => onSolo(track.id)}
+              >
+                S
+              </Button>
+              
+              <Button
+                variant={showEQ ? 'primary' : 'outline-secondary'}
+                size="sm"
+                onClick={() => setShowEQ(!showEQ)}
+              >
+                <FaSlidersH />
+              </Button>
+              
+              <Button
+                variant="outline-danger"
+                size="sm"
+                onClick={() => onDelete(track.id)}
+              >
+                <FaTrash />
+              </Button>
             </div>
           </div>
           
-          <div className="volume-control d-flex align-items-center mb-2">
-            <FaVolumeUp className="me-2" />
-            <Form.Range
-              min={0}
-              max={1}
-              step={0.01}
-              value={track.volume || 1}
-              onChange={(e) => onVolumeChange(track.id, parseFloat(e.target.value))}
-              style={{ width: '100px' }}
+          <div className="vu-meter ms-2">
+            <VUMeter 
+              key={`${track.id}-${isRecording ? 'recording' : 'playback'}`}
+              audioNode={vuAudioNode}
+              width={20}
+              height={100}
             />
-          </div>
-          
-          <div className="d-flex gap-1">
-            <Button
-              variant={track.muted ? 'warning' : 'outline-secondary'}
-              size="sm"
-              onClick={() => onMute(track.id)}
-            >
-              M
-            </Button>
-            
-            <Button
-              variant={track.solo ? 'success' : 'outline-secondary'}
-              size="sm"
-              onClick={() => onSolo(track.id)}
-            >
-              S
-            </Button>
-            
-            <Button
-              variant={showEQ ? 'primary' : 'outline-secondary'}
-              size="sm"
-              onClick={() => setShowEQ(!showEQ)}
-            >
-              <FaSlidersH />
-            </Button>
-            
-            <Button
-              variant="outline-danger"
-              size="sm"
-              onClick={() => onDelete(track.id)}
-            >
-              <FaTrash />
-            </Button>
           </div>
         </div>
         
@@ -125,7 +127,7 @@ const Track = ({
               <WaveformDisplay 
                 audioBuffer={track.buffer}
                 width={600}
-                height={60}
+                height={100}
                 currentTime={currentTime}
                 duration={projectDuration}
                 zoom={zoom}
