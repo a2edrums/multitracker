@@ -110,20 +110,20 @@ const Track = ({
             <VUMeter 
               key={`${track.id}-${isRecording ? 'recording' : 'playback'}`}
               audioNode={vuAudioNode}
-              width={20}
+              width={10}
               height={100}
             />
           </div>
         </div>
         
-        <div className="track-content flex-grow-1 ms-3" style={{ height: '60px' }}>
+        <div className="track-content flex-grow-1 ms-2" style={{ height: '100px' }}>
           {isRecording ? (
             <div className="recording-indicator d-flex align-items-center justify-content-center h-100 text-danger" style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
               <div className="spinner-grow spinner-grow-sm me-2" role="status"></div>
               Recording...
             </div>
           ) : (track.buffer && track.hasAudio) || track.buffer ? (
-            <div className="flex-grow-1" style={{ height: '60px' }}>
+            <div className="flex-grow-1" style={{ height: '100px' }}>
               <WaveformDisplay 
                 audioBuffer={track.buffer}
                 width={600}

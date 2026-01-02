@@ -64,7 +64,7 @@ const VUMeter = ({
         if (peakRef.current < 0.01) peakRef.current = 0; // Clear when very low
       }
 
-      ctx.fillStyle = '#1a1a1a';
+      ctx.fillStyle = '#2a2a2a';
       ctx.fillRect(0, 0, width, height);
 
       const barHeight = level * height;

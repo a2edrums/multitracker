@@ -347,7 +347,8 @@ function App() {
       <Container fluid className="flex-grow-1 d-flex flex-column p-0">
         {/* Toolbar */}
         <div className="studio-panel p-2 d-flex justify-content-between align-items-center">
-          <div className="d-flex gap-2">
+          <div className="d-flex align-items-center gap-2">
+            <h4 className="mb-0" style={{ color: '#a77e4d' }}>MultiTrack Studio</h4>
             <Button variant="outline-primary" onClick={addTrack}>
               <FaPlus className="me-1" /> Add Track
             </Button>
@@ -386,7 +387,7 @@ function App() {
           <Col className="d-flex flex-column">
             {/* Timeline Area */}
             <div className="d-flex">
-              <div style={{ minWidth: '286px' }}></div>
+              <div style={{ minWidth: '268px' }}></div>
               <div className="flex-grow-1 ms-3">
                 <Timeline 
                   currentTime={currentTime}
