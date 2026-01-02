@@ -28,27 +28,14 @@ const WaveformDisplay = ({
     ctx.fillStyle = '#2a2a2a';
     ctx.fillRect(0, 0, actualWidth, height);
     
-    if (audioBuffer) {
-      drawWaveform(ctx, audioBuffer, actualWidth, height, color);
-    }
-    
-    // Draw playhead if playing
-    if (currentTime > 0 && duration > 0) {
-      drawPlayhead(ctx, actualWidth, height, currentTime, duration, zoom);
-    }
-  }, [audioBuffer, width, height, currentTime, duration, color, zoom]);
-
-  const drawWaveform = (ctx, buffer, canvasWidth, canvasHeight, waveColor) => {
+    const drawWaveform = (ctx, buffer, canvasWidth, canvasHeight, waveColor) => {
     const data = buffer.getChannelData(0); // Use first channel
     const sampleRate = buffer.sampleRate;
     const bufferDuration = buffer.length / sampleRate;
     
-    // Calculate visible duration based on zoom
-    const visibleDuration = duration / zoom;
-    
-    // Calculate how much of the canvas width this audio should occupy
-    const audioWidthRatio = bufferDuration / visibleDuration;
-    const audioPixelWidth = canvasWidth * audioWidthRatio;
+    // Use same time-to-pixel calculation as timeline
+    const pixelsPerSecond = canvasWidth / duration;
+    const audioPixelWidth = bufferDuration * pixelsPerSecond;
     
     // Only draw if the audio is visible in the current view
     if (audioPixelWidth < 1) return;
@@ -96,10 +83,19 @@ const WaveformDisplay = ({
     ctx.fill();
     ctx.globalAlpha = 1.0;
   };
+    
+    if (audioBuffer) {
+      drawWaveform(ctx, audioBuffer, actualWidth, height, color);
+    }
+    
+    // Draw playhead if playing
+    if (currentTime > 0 && duration > 0) {
+      drawPlayhead(ctx, actualWidth, height, currentTime, duration);
+    }
+  }, [audioBuffer, width, height, currentTime, duration, color, zoom]);
 
-  const drawPlayhead = (ctx, canvasWidth, canvasHeight, time, totalDuration, zoomLevel = 1) => {
-    const visibleDuration = totalDuration / zoomLevel;
-    const x = (time / visibleDuration) * canvasWidth;
+  const drawPlayhead = (ctx, canvasWidth, canvasHeight, time, totalDuration) => {
+    const x = (time / totalDuration) * canvasWidth;
     
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1;

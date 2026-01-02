@@ -9,10 +9,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - multitracker.app.flg.domo
+        - multitracker.app.phx.domo
       secretName: star-app-tls
   rules:
-    - host: multitracker.app.flg.domo
+    - host: multitracker.app.phx.domo
       http:
         paths:
           - path: /

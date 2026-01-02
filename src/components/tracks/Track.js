@@ -127,7 +127,7 @@ const Track = ({
                 width={600}
                 height={60}
                 currentTime={currentTime}
-                duration={track.buffer ? track.buffer.duration : projectDuration}
+                duration={projectDuration}
                 zoom={zoom}
                 color="#0d6efd"
               />
