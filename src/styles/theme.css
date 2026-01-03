@@ -85,36 +85,3 @@ body {
 .text-muted {
   color: var(--studio-text-muted) !important;
 }
-
-.form-range {
-  background-color: transparent;
-}
-
-.form-range::-webkit-slider-track {
-  background-color: #404040;
-  border-radius: 5px;
-  height: 5px;
-}
-
-.form-range::-webkit-slider-thumb {
-  background-color: #0d6efd;
-  border: none;
-  border-radius: 50%;
-  height: 15px;
-  width: 15px;
-}
-
-.form-range::-moz-range-track {
-  background-color: #404040;
-  border-radius: 5px;
-  height: 5px;
-  border: none;
-}
-
-.form-range::-moz-range-thumb {
-  background-color: #0d6efd;
-  border: none;
-  border-radius: 50%;
-  height: 15px;
-  width: 15px;
-}

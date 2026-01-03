@@ -88,12 +88,23 @@ function App() {
               const audioBuffer = await convertBlobToAudioBuffer(blob);
               console.log('Converted to audio buffer:', track.id, audioBuffer ? audioBuffer.duration : 'null');
               if (audioBuffer) {
+                // Create new buffer with the correct audio context
+                const correctBuffer = audioEngine.context.createBuffer(
+                  audioBuffer.numberOfChannels,
+                  audioBuffer.length,
+                  audioBuffer.sampleRate
+                );
+                for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+                  correctBuffer.copyToChannel(audioBuffer.getChannelData(channel), channel);
+                }
+                
                 const engineTrack = audioEngine.tracks.get(track.id);
                 if (engineTrack) {
-                  engineTrack.buffer = audioBuffer;
+                  engineTrack.buffer = correctBuffer;
+                  console.log('Set buffer on engine track:', track.id);
                 }
                 setTracks(prev => prev.map(t => 
-                  t.id === track.id ? { ...t, buffer: audioBuffer } : t
+                  t.id === track.id ? { ...t, buffer: correctBuffer } : t
                 ));
                 console.log('Updated track with audio buffer:', track.id);
               }
@@ -113,6 +124,19 @@ function App() {
     ));
     setProjectDuration(maxDuration);
   }, [tracks]);
+
+  // Sync React track buffers to AudioEngine tracks
+  React.useEffect(() => {
+    tracks.forEach(track => {
+      if (track.buffer) {
+        const engineTrack = audioEngine.tracks.get(track.id);
+        if (engineTrack && !engineTrack.buffer) {
+          engineTrack.buffer = track.buffer;
+          console.log('Synced buffer to engine track:', track.id);
+        }
+      }
+    });
+  }, [tracks, audioEngine]);
 
   const addTrack = useCallback(async () => {
     // Initialize audio if needed
@@ -170,16 +194,27 @@ function App() {
   }, []);
 
   const handleMute = useCallback((trackId) => {
+    const track = audioEngine.tracks.get(trackId);
+    if (track) {
+      track.muted = !track.muted;
+    }
     setTracks(prev => prev.map(track => 
       track.id === trackId ? { ...track, muted: !track.muted } : track
     ));
-  }, []);
+  }, [audioEngine]);
 
   const handleSolo = useCallback((trackId) => {
+    const newSoloState = !tracks.find(t => t.id === trackId)?.solo;
+    tracks.forEach(track => {
+      const engineTrack = audioEngine.tracks.get(track.id);
+      if (engineTrack) {
+        engineTrack.solo = track.id === trackId ? newSoloState : false;
+      }
+    });
     setTracks(prev => prev.map(track => 
-      track.id === trackId ? { ...track, solo: !track.solo } : track
+      track.id === trackId ? { ...track, solo: !track.solo } : { ...track, solo: false }
     ));
-  }, []);
+  }, [tracks, audioEngine]);
 
   const handleEQChange = useCallback((trackId, band, gain) => {
     audioEngine.setTrackEQ(trackId, band, gain);
@@ -247,13 +282,23 @@ function App() {
       convertBlobToAudioBuffer(recordedBlob).then(async audioBuffer => {
         if (audioBuffer) {
           console.log('Audio buffer created, duration:', audioBuffer.duration, 'channels:', audioBuffer.numberOfChannels);
+          // Create new buffer with the correct audio context
+          const correctBuffer = audioEngine.context.createBuffer(
+            audioBuffer.numberOfChannels,
+            audioBuffer.length,
+            audioBuffer.sampleRate
+          );
+          for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+            correctBuffer.copyToChannel(audioBuffer.getChannelData(channel), channel);
+          }
+          
           const track = audioEngine.tracks.get(recordingTrackId);
           if (track) {
-            track.buffer = audioBuffer;
+            track.buffer = correctBuffer;
             // Save audio blob to IndexedDB
             await db.saveAudioBlob(recordingTrackId, recordedBlob);
             setTracks(prev => prev.map(t => 
-              t.id === recordingTrackId ? { ...t, buffer: audioBuffer, hasAudio: true } : t
+              t.id === recordingTrackId ? { ...t, buffer: correctBuffer, hasAudio: true } : t
             ));
             console.log('Track updated with audio buffer');
           } else {
