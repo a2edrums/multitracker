@@ -35,23 +35,21 @@ const Timeline = ({
     
     // Draw playhead
     if (currentTime >= 0) {
-      drawPlayhead(ctx, rect.width, currentTime, duration);
+      drawPlayhead(ctx, rect.width, currentTime, duration, zoom);
     }
   }, [currentTime, duration, zoom]);
 
   const drawTimeRuler = (ctx, width, totalDuration, zoomLevel) => {
-    const pixelsPerSecond = (width / totalDuration) * zoomLevel;
+    const visibleDuration = totalDuration / zoomLevel;
+    const pixelsPerSecond = width / visibleDuration;
     const majorInterval = pixelsPerSecond >= 100 ? 1 : pixelsPerSecond >= 50 ? 2 : 5;
     
     ctx.strokeStyle = '#666';
     ctx.fillStyle = '#b0b0b0';
     ctx.font = '10px monospace';
     
-    for (let time = 0; time <= totalDuration; time += majorInterval) {
-      const x = (time / totalDuration) * width;
-      
-      // Only draw if there's enough space from previous label
-      const shouldDrawLabel = time === 0 || x > 60; // 60px minimum spacing
+    for (let time = 0; time <= visibleDuration; time += majorInterval) {
+      const x = (time / visibleDuration) * width;
       
       // Major tick
       ctx.beginPath();
@@ -59,17 +57,15 @@ const Timeline = ({
       ctx.lineTo(x, 40);
       ctx.stroke();
       
-      // Time label with spacing check
-      if (shouldDrawLabel) {
-        ctx.fillText(formatTime(time), x + 2, 15);
-      }
+      // Time label
+      ctx.fillText(formatTime(time), x + 2, 15);
       
       // Minor ticks
       if (majorInterval > 1) {
         for (let minor = 1; minor < majorInterval; minor++) {
           const minorTime = time + minor;
-          if (minorTime <= totalDuration) {
-            const minorX = (minorTime / totalDuration) * width;
+          if (minorTime <= visibleDuration) {
+            const minorX = (minorTime / visibleDuration) * width;
             ctx.beginPath();
             ctx.moveTo(minorX, 30);
             ctx.lineTo(minorX, 40);
@@ -80,8 +76,9 @@ const Timeline = ({
     }
   };
 
-  const drawPlayhead = (ctx, width, time, totalDuration) => {
-    const x = (time / totalDuration) * width;
+  const drawPlayhead = (ctx, width, time, totalDuration, zoomLevel) => {
+    const visibleDuration = totalDuration / zoomLevel;
+    const x = (time / visibleDuration) * width;
     
     ctx.strokeStyle = '#0d6efd';
     ctx.lineWidth = 2;

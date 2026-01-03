@@ -33,8 +33,9 @@ const WaveformDisplay = ({
     const sampleRate = buffer.sampleRate;
     const bufferDuration = buffer.length / sampleRate;
     
-    // Use same time-to-pixel calculation as timeline
-    const pixelsPerSecond = canvasWidth / duration;
+    // Use same zoom calculation as timeline
+    const visibleDuration = duration / zoom;
+    const pixelsPerSecond = canvasWidth / visibleDuration;
     const audioPixelWidth = bufferDuration * pixelsPerSecond;
     
     // Only draw if the audio is visible in the current view
@@ -90,12 +91,13 @@ const WaveformDisplay = ({
     
     // Draw playhead if playing
     if (currentTime > 0 && duration > 0) {
-      drawPlayhead(ctx, actualWidth, height, currentTime, duration);
+      drawPlayhead(ctx, actualWidth, height, currentTime, duration, zoom);
     }
   }, [audioBuffer, width, height, currentTime, duration, color, zoom]);
 
-  const drawPlayhead = (ctx, canvasWidth, canvasHeight, time, totalDuration) => {
-    const x = (time / totalDuration) * canvasWidth;
+  const drawPlayhead = (ctx, canvasWidth, canvasHeight, time, totalDuration, zoomLevel) => {
+    const visibleDuration = totalDuration / zoomLevel;
+    const x = (time / visibleDuration) * canvasWidth;
     
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1;
