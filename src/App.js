@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Container, Row, Col, Button } from 'react-bootstrap';
-import { FaPlus, FaFileImport, FaDownload } from 'react-icons/fa';
+import { FaPlus, FaFileImport, FaDownload, FaFolderOpen } from 'react-icons/fa';
 import { v4 as uuidv4 } from 'uuid';
 
 import { useAudioContext } from './hooks/useAudioContext.js';
@@ -11,6 +11,7 @@ import TransportControls from './components/transport/TransportControls.js';
 import Timeline from './components/transport/Timeline.js';
 import Track from './components/tracks/Track.js';
 import VUMeter from './components/common/VUMeter.js';
+import SpectrumAnalyzer from './components/common/SpectrumAnalyzer.js';
 import FileService from './services/FileService.js';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -25,8 +26,10 @@ function App() {
   const [recordingTrackId, setRecordingTrackId] = useState(null);
   const [armedTrackId, setArmedTrackId] = useState(null);
   const [projectDuration, setProjectDuration] = useState(60);
-  const [currentProjectId] = useState('default-project');
+  const [currentProjectId, setCurrentProjectId] = useState(null);
   const [zoom, setZoom] = useState(1);
+  const [projects, setProjects] = useState([]);
+  const [showProjectSelector, setShowProjectSelector] = useState(true);
 
   // Save tracks to IndexedDB whenever tracks change
   React.useEffect(() => {
@@ -45,9 +48,18 @@ function App() {
     }
   }, [tracks, isReady, db, currentProjectId]);
 
-  // Load tracks from IndexedDB on startup
+  // Load projects list on startup
   React.useEffect(() => {
     if (isReady) {
+      db.getAllProjects().then(projectList => {
+        setProjects(projectList);
+      });
+    }
+  }, [isReady, db]);
+
+  // Load tracks from IndexedDB when project is selected
+  React.useEffect(() => {
+    if (isReady && currentProjectId) {
       db.loadProject(currentProjectId).then(project => {
         if (project && project.tracks) {
           console.log('Loaded project tracks:', project.tracks);
@@ -356,6 +368,27 @@ function App() {
     }
   }, [tracks]);
 
+  const handleProjectSelect = useCallback(async (projectId) => {
+    setCurrentProjectId(projectId);
+    setShowProjectSelector(false);
+    await initializeAudio();
+  }, [initializeAudio]);
+
+  const handleNewProject = useCallback(async () => {
+    const projectId = uuidv4();
+    const newProject = {
+      id: projectId,
+      name: `Project ${projects.length + 1}`,
+      tracks: [],
+      created: Date.now(),
+      updated: Date.now()
+    };
+    await db.saveProject(newProject);
+    setCurrentProjectId(projectId);
+    setShowProjectSelector(false);
+    await initializeAudio();
+  }, [projects.length, db, initializeAudio]);
+
   if (needsUserActivation) {
     return (
       <div className="d-flex justify-content-center align-items-center vh-100">
@@ -374,14 +407,44 @@ function App() {
     );
   }
 
-  if (!isReady) {
+  if (!isReady || showProjectSelector) {
     return (
       <div className="d-flex justify-content-center align-items-center vh-100">
         <div className="text-center">
-          <div className="spinner-border text-primary mb-3" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p>Initializing Database...</p>
+          {!isReady ? (
+            <>
+              <div className="spinner-border text-primary mb-3" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <p>Initializing Database...</p>
+            </>
+          ) : (
+            <>
+              <h3 className="mb-4">🎵 MultiTracker Studio</h3>
+              <h5 className="mb-4">Select a Project</h5>
+              <div className="d-grid gap-2" style={{ minWidth: '300px' }}>
+                <Button 
+                  variant="primary" 
+                  size="lg"
+                  onClick={handleNewProject}
+                >
+                  Create New Project
+                </Button>
+                {projects.map(project => (
+                  <Button
+                    key={project.id}
+                    variant="outline-secondary"
+                    onClick={() => handleProjectSelect(project.id)}
+                  >
+                    {project.name}
+                    <small className="d-block text-muted">
+                      {new Date(project.updated).toLocaleDateString()}
+                    </small>
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -403,14 +466,26 @@ function App() {
             <Button variant="outline-secondary" onClick={handleExport}>
               <FaDownload className="me-1" /> Export
             </Button>
+            <Button variant="outline-secondary" onClick={() => setShowProjectSelector(true)}>
+              <FaFolderOpen className="me-1" /> Projects
+            </Button>
           </div>
           
           <div className="d-flex align-items-center gap-3">
+            <div className="master-spectrum">
+              <SpectrumAnalyzer 
+                key={`master-spectrum-${tracks.length}`}
+                audioNode={audioEngine?.masterVUGain}
+                width={120}
+                height={40}
+                bars={16}
+              />
+            </div>
             <div className="master-vu">
               <VUMeter 
                 key={`master-vu-${tracks.length}`}
                 audioNode={audioEngine?.masterVUGain}
-                width={30}
+                width={10}
                 height={40}
               />
             </div>
