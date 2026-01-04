@@ -34,23 +34,19 @@ export const useAudioRecording = (audioContext) => {
       });
 
       mediaRecorderRef.current.ondataavailable = (event) => {
-        console.log('Data available, size:', event.data.size);
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
       };
 
       mediaRecorderRef.current.onstop = () => {
-        console.log('MediaRecorder stopped, chunks:', chunksRef.current.length);
         const blob = new Blob(chunksRef.current, { type: 'audio/webm;codecs=opus' });
-        console.log('Created blob, size:', blob.size);
         setRecordedBlob(blob);
         setInputNode(null);
       };
 
       mediaRecorderRef.current.start(100); // Collect data every 100ms
       setIsRecording(true);
-      console.log('MediaRecorder started');
       return true;
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -59,9 +55,7 @@ export const useAudioRecording = (audioContext) => {
   }, [audioContext]);
 
   const stopRecording = useCallback(() => {
-    console.log('stopRecording called, isRecording:', isRecording);
     if (mediaRecorderRef.current && isRecording) {
-      console.log('Stopping MediaRecorder');
       mediaRecorderRef.current.stop();
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());

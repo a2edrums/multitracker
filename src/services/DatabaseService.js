@@ -29,11 +29,9 @@ class DatabaseService {
           }
         }
       });
-      console.log('Database initialized successfully');
       return true;
     } catch (error) {
       console.error('Failed to initialize database:', error);
-      // Return true anyway - app can work without persistent storage
       return true;
     }
   }

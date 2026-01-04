@@ -8,10 +8,8 @@ export const useAudioContext = () => {
   const [currentTime, setCurrentTime] = useState(0);
 
   const initializeAudio = useCallback(async () => {
-    console.log('Attempting to initialize audio...');
     try {
       const success = await AudioEngine.initialize();
-      console.log('Audio initialization result:', success);
       if (success) {
         setIsInitialized(true);
         setNeedsUserActivation(false);

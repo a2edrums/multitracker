@@ -36,7 +36,6 @@ class AudioEngine {
         throw new Error('Audio context failed to start');
       }
       
-      console.log('Audio context initialized successfully');
       return true;
     } catch (error) {
       console.error('Failed to initialize audio context:', error);
@@ -164,16 +163,11 @@ class AudioEngine {
   }
 
   playAllTracks() {
-    console.log('playAllTracks called, tracks:', this.tracks.size);
     const hasSoloTracks = Array.from(this.tracks.values()).some(track => track.solo);
-    console.log('hasSoloTracks:', hasSoloTracks);
     this.tracks.forEach(track => {
-      console.log('Track:', track.id, 'buffer:', !!track.buffer, 'muted:', track.muted, 'solo:', track.solo);
       if (track.buffer) {
         const shouldPlay = hasSoloTracks ? track.solo : !track.muted;
-        console.log('shouldPlay:', shouldPlay);
         if (shouldPlay) {
-          console.log('Playing track:', track.id);
           this.playTrack(track);
         }
       }

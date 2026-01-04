@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Container, Row, Col, Button } from 'react-bootstrap';
+import { Container, Row, Col, Button, Form } from 'react-bootstrap';
 import { FaPlus, FaFileImport, FaDownload, FaFolderOpen } from 'react-icons/fa';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -27,53 +27,101 @@ function App() {
   const [armedTrackId, setArmedTrackId] = useState(null);
   const [projectDuration, setProjectDuration] = useState(60);
   const [currentProjectId, setCurrentProjectId] = useState(null);
+  const [currentProjectName, setCurrentProjectName] = useState('');
   const [zoom, setZoom] = useState(1);
+  const [masterVolume, setMasterVolume] = useState(1);
   const [projects, setProjects] = useState([]);
   const [showProjectSelector, setShowProjectSelector] = useState(true);
+  const [newProjectName, setNewProjectName] = useState('');
 
-  // Save tracks to IndexedDB whenever tracks change
+  // Save project data whenever any studio setting changes
   React.useEffect(() => {
-    if (isReady && tracks.length > 0) {
-      const projectData = {
-        id: currentProjectId,
-        name: 'Current Project',
-        tracks: tracks.map(track => ({
-          ...track,
-          buffer: null // Don't save buffer in project data
-        })),
-        created: Date.now(),
-        updated: Date.now()
-      };
-      db.saveProject(projectData);
+    if (isReady && currentProjectId && tracks.length >= 0) {
+      // Load existing project to preserve created timestamp
+      db.loadProject(currentProjectId).then(existingProject => {
+        const projectData = {
+          id: currentProjectId,
+          name: currentProjectName || 'Untitled Project',
+          tracks: tracks.map(track => ({
+            ...track,
+            buffer: null // Don't save buffer in project data
+          })),
+          settings: {
+            zoom,
+            masterVolume,
+            bpm,
+            isMetronomeOn,
+            projectDuration,
+            armedTrackId,
+            recordingTrackId
+          },
+          created: existingProject?.created || Date.now(),
+          updated: Date.now()
+        };
+        db.saveProject(projectData);
+      });
     }
-  }, [tracks, isReady, db, currentProjectId]);
+  }, [tracks, zoom, masterVolume, bpm, isMetronomeOn, projectDuration, armedTrackId, recordingTrackId, currentProjectName, isReady, db, currentProjectId]);
 
-  // Load projects list on startup
+  // Load last project on startup
   React.useEffect(() => {
     if (isReady) {
+      // First load projects list
       db.getAllProjects().then(projectList => {
         setProjects(projectList);
+        
+        // Try to load last project ID from localStorage
+        const lastProjectId = localStorage.getItem('multitracker-last-project');
+        if (lastProjectId && projectList.find(p => p.id === lastProjectId)) {
+          setCurrentProjectId(lastProjectId);
+          setShowProjectSelector(false);
+        }
       });
     }
   }, [isReady, db]);
 
-  // Load tracks from IndexedDB when project is selected
+  // Load project data when project is selected
   React.useEffect(() => {
     if (isReady && currentProjectId) {
       db.loadProject(currentProjectId).then(project => {
-        if (project && project.tracks) {
-          console.log('Loaded project tracks:', project.tracks);
-          setTracks(project.tracks);
-          // Recreate audio engine tracks - but only if audio engine is initialized
-          if (audioEngine.context) {
+        if (project) {
+          setCurrentProjectName(project.name || '');
+          setTracks(project.tracks || []);
+          
+          // Load project settings
+          if (project.settings) {
+            setZoom(project.settings.zoom || 1);
+            setMasterVolume(project.settings.masterVolume || 1);
+            setBpm(project.settings.bpm || 120);
+            setProjectDuration(project.settings.projectDuration || 60);
+            setArmedTrackId(project.settings.armedTrackId || null);
+            setRecordingTrackId(project.settings.recordingTrackId || null);
+            
+            // Apply master volume to audio engine
+            audioEngine.setMasterVolume(project.settings.masterVolume || 1);
+          }
+          
+          // Recreate audio engine tracks with their settings
+          if (audioEngine.context && project.tracks) {
             project.tracks.forEach(track => {
-              audioEngine.createTrack(track.id);
+              const engineTrack = audioEngine.createTrack(track.id);
+              if (engineTrack) {
+                // Restore track settings
+                audioEngine.setTrackVolume(track.id, track.volume || 1);
+                if (track.effects) {
+                  audioEngine.setTrackEQ(track.id, 'low', track.effects.lowGain || 0);
+                  audioEngine.setTrackEQ(track.id, 'mid', track.effects.midGain || 0);
+                  audioEngine.setTrackEQ(track.id, 'high', track.effects.highGain || 0);
+                }
+                engineTrack.muted = track.muted || false;
+                engineTrack.solo = track.solo || false;
+              }
             });
           }
         }
       });
     }
-  }, [isReady, db, currentProjectId, audioEngine]);
+  }, [isReady, db, currentProjectId, audioEngine, setBpm]);
 
   // Create audio engine tracks when audio context becomes available
   React.useEffect(() => {
@@ -88,19 +136,14 @@ function App() {
 
   // Load audio blobs for existing tracks
   React.useEffect(() => {
-    if (isReady) {
-      console.log('Loading audio for tracks:', tracks.filter(t => t.hasAudio && !t.buffer));
+    if (isReady && tracks.length > 0) {
       tracks.forEach(async track => {
         if (track.hasAudio && !track.buffer) {
-          console.log('Loading audio for track:', track.id);
           try {
             const blob = await db.loadAudioBlob(track.id);
-            console.log('Loaded blob for track:', track.id, blob ? blob.size : 'null');
-            if (blob && convertBlobToAudioBuffer) {
+            if (blob && convertBlobToAudioBuffer && audioEngine.context) {
               const audioBuffer = await convertBlobToAudioBuffer(blob);
-              console.log('Converted to audio buffer:', track.id, audioBuffer ? audioBuffer.duration : 'null');
               if (audioBuffer) {
-                // Create new buffer with the correct audio context
                 const correctBuffer = audioEngine.context.createBuffer(
                   audioBuffer.numberOfChannels,
                   audioBuffer.length,
@@ -113,16 +156,14 @@ function App() {
                 const engineTrack = audioEngine.tracks.get(track.id);
                 if (engineTrack) {
                   engineTrack.buffer = correctBuffer;
-                  console.log('Set buffer on engine track:', track.id);
                 }
                 setTracks(prev => prev.map(t => 
                   t.id === track.id ? { ...t, buffer: correctBuffer } : t
                 ));
-                console.log('Updated track with audio buffer:', track.id);
               }
             }
           } catch (error) {
-            console.error('Failed to load audio for track:', track.id, error);
+            console.error('Failed to load audio for track:', track.id);
           }
         }
       });
@@ -144,7 +185,6 @@ function App() {
         const engineTrack = audioEngine.tracks.get(track.id);
         if (engineTrack && !engineTrack.buffer) {
           engineTrack.buffer = track.buffer;
-          console.log('Synced buffer to engine track:', track.id);
         }
       }
     });
@@ -189,6 +229,7 @@ function App() {
   }, [audioEngine, db]);
 
   const handleVolumeChange = useCallback((volume) => {
+    setMasterVolume(volume);
     audioEngine.setMasterVolume(volume);
   }, [audioEngine]);
 
@@ -262,27 +303,20 @@ function App() {
   }, [isRecording, stopRecording, stop]);
 
   const handleRecord = useCallback(async () => {
-    console.log('Record button clicked, isRecording:', isRecording, 'armedTrackId:', armedTrackId);
     if (!isInitialized) {
       await initializeAudio();
     }
     
     if (isRecording) {
-      console.log('Stopping recording');
       stopRecording();
-      // Don't clear recordingTrackId here - let the audio processing useEffect handle it
     } else {
       if (armedTrackId) {
-        console.log('Starting recording on track:', armedTrackId);
         const success = await startRecording();
         if (success) {
           setRecordingTrackId(armedTrackId);
-          console.log('Recording started successfully');
         } else {
           console.error('Failed to start recording');
         }
-      } else {
-        console.log('No track armed for recording');
       }
     }
   }, [isRecording, startRecording, stopRecording, isInitialized, initializeAudio, armedTrackId]);
@@ -290,11 +324,8 @@ function App() {
   // Handle recorded audio
   React.useEffect(() => {
     if (recordedBlob && recordingTrackId) {
-      console.log('Processing recorded audio for track:', recordingTrackId, 'blob size:', recordedBlob.size);
       convertBlobToAudioBuffer(recordedBlob).then(async audioBuffer => {
         if (audioBuffer) {
-          console.log('Audio buffer created, duration:', audioBuffer.duration, 'channels:', audioBuffer.numberOfChannels);
-          // Create new buffer with the correct audio context
           const correctBuffer = audioEngine.context.createBuffer(
             audioBuffer.numberOfChannels,
             audioBuffer.length,
@@ -307,19 +338,16 @@ function App() {
           const track = audioEngine.tracks.get(recordingTrackId);
           if (track) {
             track.buffer = correctBuffer;
-            // Save audio blob to IndexedDB
             await db.saveAudioBlob(recordingTrackId, recordedBlob);
             setTracks(prev => prev.map(t => 
               t.id === recordingTrackId ? { ...t, buffer: correctBuffer, hasAudio: true } : t
             ));
-            console.log('Track updated with audio buffer');
           } else {
             console.error('Track not found in audio engine:', recordingTrackId);
           }
         } else {
           console.error('Failed to create audio buffer from blob');
         }
-        // Clear the recorded blob and recording track ID after processing
         setRecordedBlob(null);
         setRecordingTrackId(null);
       }).catch(error => {
@@ -369,25 +397,71 @@ function App() {
   }, [tracks]);
 
   const handleProjectSelect = useCallback(async (projectId) => {
-    setCurrentProjectId(projectId);
+    // Update localStorage and close selector first
+    localStorage.setItem('multitracker-last-project', projectId);
     setShowProjectSelector(false);
-    await initializeAudio();
-  }, [initializeAudio]);
+    
+    // Clear audio engine tracks
+    audioEngine.tracks.forEach((_, trackId) => {
+      audioEngine.removeTrack(trackId);
+    });
+    
+    // Set new project ID (this will trigger the load effect)
+    setCurrentProjectId(projectId);
+    
+    if (!audioEngine.context) {
+      await initializeAudio();
+    }
+  }, [initializeAudio, audioEngine]);
 
   const handleNewProject = useCallback(async () => {
     const projectId = uuidv4();
+    const projectName = newProjectName.trim() || `Project ${projects.length + 1}`;
     const newProject = {
       id: projectId,
-      name: `Project ${projects.length + 1}`,
+      name: projectName,
       tracks: [],
+      settings: {
+        zoom: 1,
+        masterVolume: 1,
+        bpm: 120,
+        isMetronomeOn: false,
+        projectDuration: 60,
+        armedTrackId: null,
+        recordingTrackId: null
+      },
       created: Date.now(),
       updated: Date.now()
     };
     await db.saveProject(newProject);
+    
+    // Reset all state
     setCurrentProjectId(projectId);
+    setCurrentProjectName(projectName);
+    localStorage.setItem('multitracker-last-project', projectId);
+    setTracks([]);
+    setZoom(1);
+    setMasterVolume(1);
+    setBpm(120);
+    setProjectDuration(60);
+    setArmedTrackId(null);
+    setRecordingTrackId(null);
+    setNewProjectName('');
     setShowProjectSelector(false);
-    await initializeAudio();
-  }, [projects.length, db, initializeAudio]);
+    
+    if (!audioEngine.context) {
+      await initializeAudio();
+    } else {
+      audioEngine.setMasterVolume(1);
+    }
+  }, [newProjectName, projects.length, db, initializeAudio, audioEngine, setBpm]);
+
+  const handleOpenProjectSelector = useCallback(async () => {
+    // Refresh projects list
+    const projectList = await db.getAllProjects();
+    setProjects(projectList);
+    setShowProjectSelector(true);
+  }, [db]);
 
   if (needsUserActivation) {
     return (
@@ -421,27 +495,50 @@ function App() {
           ) : (
             <>
               <h3 className="mb-4">🎵 MultiTracker Studio</h3>
-              <h5 className="mb-4">Select a Project</h5>
-              <div className="d-grid gap-2" style={{ minWidth: '300px' }}>
-                <Button 
-                  variant="primary" 
-                  size="lg"
-                  onClick={handleNewProject}
-                >
-                  Create New Project
-                </Button>
-                {projects.map(project => (
-                  <Button
-                    key={project.id}
-                    variant="outline-secondary"
-                    onClick={() => handleProjectSelect(project.id)}
+              <div className="d-grid gap-3" style={{ minWidth: '350px' }}>
+                <div>
+                  <Form.Control
+                    type="text"
+                    placeholder="Project name (optional)"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    className="mb-2"
+                  />
+                  <Button 
+                    variant="primary" 
+                    size="lg"
+                    onClick={handleNewProject}
+                    className="w-100"
                   >
-                    {project.name}
-                    <small className="d-block text-muted">
-                      {new Date(project.updated).toLocaleDateString()}
-                    </small>
+                    Create New Project
                   </Button>
-                ))}
+                </div>
+                
+                {projects.length > 0 && (
+                  <>
+                    <div className="text-center text-muted">
+                      <small>— or —</small>
+                    </div>
+                    <div>
+                      <h6 className="mb-2">Open Existing Project:</h6>
+                      {projects.map(project => (
+                        <Button
+                          key={project.id}
+                          variant="outline-secondary"
+                          onClick={() => handleProjectSelect(project.id)}
+                          className="w-100 mb-2 text-start"
+                        >
+                          <div>
+                            <div>{project.name}</div>
+                            <small className="text-muted">
+                              {new Date(project.updated).toLocaleDateString()}
+                            </small>
+                          </div>
+                        </Button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -466,7 +563,7 @@ function App() {
             <Button variant="outline-secondary" onClick={handleExport}>
               <FaDownload className="me-1" /> Export
             </Button>
-            <Button variant="outline-secondary" onClick={() => setShowProjectSelector(true)}>
+            <Button variant="outline-secondary" onClick={handleOpenProjectSelector}>
               <FaFolderOpen className="me-1" /> Projects
             </Button>
           </div>
@@ -497,7 +594,7 @@ function App() {
               min={0}
               max={1}
               step={0.01}
-              defaultValue={1}
+              value={masterVolume}
               onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
             />
           </div>
