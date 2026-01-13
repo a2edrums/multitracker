@@ -20,7 +20,7 @@ import './styles/theme.css';
 function App() {
   const { isInitialized, needsUserActivation, initializeAudio, isPlaying, currentTime, play, pause, stop, audioEngine } = useAudioContext();
   const { isReady, db } = useIndexedDB();
-  const { isRecording, startRecording, stopRecording, convertBlobToAudioBuffer, recordedBlob, inputNode, setRecordedBlob } = useAudioRecording(audioEngine.context);
+  const { isRecording, startRecording, stopRecording, convertBlobToAudioBuffer, recordedBlob, inputNode, recordingBuffer, setRecordedBlob } = useAudioRecording(audioEngine.context);
   const { isMetronomeOn, bpm, setBpm, toggleMetronome } = useMetronome(audioEngine.context);
   const [tracks, setTracks] = useState([]);
   const [recordingTrackId, setRecordingTrackId] = useState(null);
@@ -115,6 +115,7 @@ function App() {
                 }
                 engineTrack.muted = track.muted || false;
                 engineTrack.solo = track.solo || false;
+                audioEngine.updateTrackGain(engineTrack);
               }
             });
           }
@@ -250,6 +251,7 @@ function App() {
     const track = audioEngine.tracks.get(trackId);
     if (track) {
       track.muted = !track.muted;
+      audioEngine.updateTrackGain(track);
     }
     setTracks(prev => prev.map(track => 
       track.id === trackId ? { ...track, muted: !track.muted } : track
@@ -262,6 +264,7 @@ function App() {
       const engineTrack = audioEngine.tracks.get(track.id);
       if (engineTrack) {
         engineTrack.solo = track.id === trackId ? newSoloState : false;
+        audioEngine.updateTrackGain(engineTrack);
       }
     });
     setTracks(prev => prev.map(track => 
@@ -314,12 +317,13 @@ function App() {
         const success = await startRecording();
         if (success) {
           setRecordingTrackId(armedTrackId);
+          play();
         } else {
           console.error('Failed to start recording');
         }
       }
     }
-  }, [isRecording, startRecording, stopRecording, isInitialized, initializeAudio, armedTrackId]);
+  }, [isRecording, startRecording, stopRecording, isInitialized, initializeAudio, armedTrackId, play]);
 
   // Handle recorded audio
   React.useEffect(() => {
@@ -639,6 +643,7 @@ function App() {
                   currentTime={currentTime}
                   audioEngine={audioEngine}
                   inputNode={isRecording && recordingTrackId === track.id ? inputNode : null}
+                  recordingBuffer={isRecording && recordingTrackId === track.id ? recordingBuffer : null}
                   zoom={zoom}
                   projectDuration={projectDuration}
                 />

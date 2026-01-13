@@ -98,8 +98,21 @@ class AudioEngine {
     const track = this.tracks.get(id);
     if (track) {
       track.volume = volume;
-      track.gainNode.gain.setValueAtTime(volume, this.context.currentTime);
+      this.updateTrackGain(track);
     }
+  }
+
+  updateTrackGain(track) {
+    const hasSoloTracks = Array.from(this.tracks.values()).some(t => t.solo);
+    let effectiveVolume = track.volume;
+    
+    if (hasSoloTracks) {
+      effectiveVolume = track.solo ? track.volume : 0;
+    } else if (track.muted) {
+      effectiveVolume = 0;
+    }
+    
+    track.gainNode.gain.setValueAtTime(effectiveVolume, this.context.currentTime);
   }
 
   setTrackEQ(id, band, gain) {
@@ -163,13 +176,10 @@ class AudioEngine {
   }
 
   playAllTracks() {
-    const hasSoloTracks = Array.from(this.tracks.values()).some(track => track.solo);
     this.tracks.forEach(track => {
       if (track.buffer) {
-        const shouldPlay = hasSoloTracks ? track.solo : !track.muted;
-        if (shouldPlay) {
-          this.playTrack(track);
-        }
+        this.updateTrackGain(track);
+        this.playTrack(track);
       }
     });
   }
@@ -185,7 +195,12 @@ class AudioEngine {
 
   playTrack(track) {
     if (track.source) {
-      track.source.stop();
+      try {
+        track.source.stop();
+      } catch (e) {
+        // Source may already be stopped
+      }
+      track.source = null;
     }
     
     track.source = this.context.createBufferSource();

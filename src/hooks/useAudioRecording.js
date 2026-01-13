@@ -4,9 +4,12 @@ export const useAudioRecording = (audioContext) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [inputNode, setInputNode] = useState(null);
+  const [recordingBuffer, setRecordingBuffer] = useState(null);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
+  const scriptProcessorRef = useRef(null);
+  const recordedSamplesRef = useRef([]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -19,11 +22,35 @@ export const useAudioRecording = (audioContext) => {
       });
       
       streamRef.current = stream;
+      recordedSamplesRef.current = [];
       
-      // Create audio input node for VU meters
+      // Create audio input node for VU meters and live waveform
       if (audioContext) {
         const source = audioContext.createMediaStreamSource(stream);
         setInputNode(source);
+        
+        // Create script processor for live audio capture
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        scriptProcessorRef.current = processor;
+        
+        processor.onaudioprocess = (e) => {
+          const inputData = e.inputBuffer.getChannelData(0);
+          recordedSamplesRef.current.push(new Float32Array(inputData));
+          
+          // Create a temporary buffer for visualization
+          const totalSamples = recordedSamplesRef.current.reduce((sum, arr) => sum + arr.length, 0);
+          const tempBuffer = audioContext.createBuffer(1, totalSamples, audioContext.sampleRate);
+          const channelData = tempBuffer.getChannelData(0);
+          let offset = 0;
+          recordedSamplesRef.current.forEach(chunk => {
+            channelData.set(chunk, offset);
+            offset += chunk.length;
+          });
+          setRecordingBuffer(tempBuffer);
+        };
+        
+        source.connect(processor);
+        processor.connect(audioContext.destination);
       }
       
       // Clear previous chunks
@@ -43,6 +70,13 @@ export const useAudioRecording = (audioContext) => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm;codecs=opus' });
         setRecordedBlob(blob);
         setInputNode(null);
+        setRecordingBuffer(null);
+        
+        // Clean up script processor
+        if (scriptProcessorRef.current) {
+          scriptProcessorRef.current.disconnect();
+          scriptProcessorRef.current = null;
+        }
       };
 
       mediaRecorderRef.current.start(100); // Collect data every 100ms
@@ -65,22 +99,11 @@ export const useAudioRecording = (audioContext) => {
   }, [isRecording]);
 
   const convertBlobToAudioBuffer = useCallback(async (blob) => {
-    if (!blob) return null;
-    
-    // Create audio context if it doesn't exist
-    let context = audioContext;
-    if (!context) {
-      try {
-        context = new (window.AudioContext || window.webkitAudioContext)();
-      } catch (error) {
-        console.error('Failed to create audio context for blob conversion:', error);
-        return null;
-      }
-    }
+    if (!blob || !audioContext) return null;
     
     try {
       const arrayBuffer = await blob.arrayBuffer();
-      return await context.decodeAudioData(arrayBuffer);
+      return await audioContext.decodeAudioData(arrayBuffer);
     } catch (error) {
       console.error('Failed to convert blob to audio buffer:', error);
       return null;
@@ -91,6 +114,7 @@ export const useAudioRecording = (audioContext) => {
     isRecording,
     recordedBlob,
     inputNode,
+    recordingBuffer,
     startRecording,
     stopRecording,
     convertBlobToAudioBuffer,

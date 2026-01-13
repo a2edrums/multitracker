@@ -42,6 +42,9 @@ export const useAudioContext = () => {
         animationFrame = requestAnimationFrame(updateTime);
       };
       updateTime();
+    } else {
+      // Update time even when not playing if recording
+      setCurrentTime(AudioEngine.getCurrentTime());
     }
     return () => {
       if (animationFrame) {

@@ -19,6 +19,7 @@ const Track = ({
   currentTime = 0,
   audioEngine,
   inputNode,
+  recordingBuffer,
   zoom = 1,
   projectDuration = 60
 }) => {
@@ -118,9 +119,16 @@ const Track = ({
         
         <div className="track-content flex-grow-1 ms-2" style={{ height: '100px' }}>
           {isRecording ? (
-            <div className="recording-indicator d-flex align-items-center justify-content-center h-100 text-danger" style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
-              <div className="spinner-grow spinner-grow-sm me-2" role="status"></div>
-              Recording...
+            <div className="flex-grow-1" style={{ height: '100px' }}>
+              <WaveformDisplay 
+                audioBuffer={recordingBuffer}
+                width={600}
+                height={100}
+                currentTime={currentTime}
+                duration={projectDuration}
+                zoom={zoom}
+                color="#dc3545"
+              />
             </div>
           ) : (track.buffer && track.hasAudio) || track.buffer ? (
             <div className="flex-grow-1" style={{ height: '100px' }}>
