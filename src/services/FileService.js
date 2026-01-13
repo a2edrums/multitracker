@@ -23,6 +23,32 @@ class FileService {
     );
   }
 
+  mixTracks(tracks, audioContext, duration) {
+    const sampleRate = audioContext.sampleRate;
+    const length = Math.ceil(duration * sampleRate);
+    const mixedBuffer = audioContext.createBuffer(2, length, sampleRate);
+    const leftChannel = mixedBuffer.getChannelData(0);
+    const rightChannel = mixedBuffer.getChannelData(1);
+
+    tracks.forEach(track => {
+      if (track.buffer && !track.muted) {
+        const hasSolo = tracks.some(t => t.solo);
+        if (hasSolo && !track.solo) return;
+
+        const volume = track.volume || 1;
+        const sourceLeft = track.buffer.getChannelData(0);
+        const sourceRight = track.buffer.numberOfChannels > 1 ? track.buffer.getChannelData(1) : sourceLeft;
+
+        for (let i = 0; i < Math.min(track.buffer.length, length); i++) {
+          leftChannel[i] += sourceLeft[i] * volume;
+          rightChannel[i] += sourceRight[i] * volume;
+        }
+      }
+    });
+
+    return mixedBuffer;
+  }
+
   async exportAudioBuffer(audioBuffer, filename = 'export.wav') {
     try {
       const wavBlob = this.audioBufferToWav(audioBuffer);

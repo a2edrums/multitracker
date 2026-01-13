@@ -391,14 +391,15 @@ function App() {
   }, [audioEngine, db]);
 
   const handleExport = useCallback(() => {
-    // For now, just export the first track with audio
-    const trackWithAudio = tracks.find(track => track.buffer);
-    if (trackWithAudio) {
-      FileService.exportAudioBuffer(trackWithAudio.buffer, `${trackWithAudio.name}.wav`);
-    } else {
+    const tracksWithAudio = tracks.filter(track => track.buffer);
+    if (tracksWithAudio.length === 0) {
       alert('No audio to export');
+      return;
     }
-  }, [tracks]);
+    
+    const mixedBuffer = FileService.mixTracks(tracks, audioEngine.context, projectDuration);
+    FileService.exportAudioBuffer(mixedBuffer, `${currentProjectName || 'mix'}.wav`);
+  }, [tracks, audioEngine.context, projectDuration, currentProjectName]);
 
   const handleProjectSelect = useCallback(async (projectId) => {
     // Update localStorage and close selector first
