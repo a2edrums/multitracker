@@ -1,0 +1,18 @@
+div.vertical-slider{
+  border: 1px solid var(--bs-border-color);
+  padding-top: 2px;
+  margin: 1px;
+  width: 28px;
+  height: 100px;
+  display: inline-block;
+  text-align: center;
+}
+
+input.vertical-slider {
+  writing-mode: vertical-lr;
+  width: 28px;
+  height: 100px;
+  padding: 0 5px;
+  margin: 0 auto;
+  transform: rotate(180deg);
+}

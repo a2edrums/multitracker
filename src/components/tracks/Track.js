@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Button, Form, Collapse } from 'react-bootstrap';
-import { FaVolumeUp, FaMicrophone, FaTrash, FaSlidersH } from 'react-icons/fa';
+import { FaMicrophone, FaTrash, FaSlidersH } from 'react-icons/fa';
 import WaveformDisplay from './WaveformDisplay.js';
 import VUMeter from '../common/VUMeter.js';
 import EQ from '../effects/EQ.js';
+import VerticalSlider from "./VerticalSlider";
 
 const Track = ({ 
   track, 
-  onVolumeChange, 
+  onVolumeChange,
+  onPanChange, 
   onNameChange,
   onMute, 
   onSolo, 
@@ -61,13 +63,13 @@ const Track = ({
             </div>
             
             <div className="volume-control d-flex align-items-center mb-2">
-              <FaVolumeUp className="me-2" />
+              <small className="me-2">Pan</small>
               <Form.Range
-                min={0}
+                min={-1}
                 max={1}
                 step={0.01}
-                value={track.volume || 1}
-                onChange={(e) => onVolumeChange(track.id, parseFloat(e.target.value))}
+                value={track.pan || 0}
+                onChange={(e) => onPanChange(track.id, parseFloat(e.target.value))}
                 style={{ width: '100px' }}
               />
             </div>
@@ -107,7 +109,11 @@ const Track = ({
             </div>
           </div>
           
-          <div className="vu-meter ms-2">
+          <div className="vu-meter ms-2 d-flex">
+            <VerticalSlider
+              volume={track.volume || 1}
+              setComponentVolume={(value) => onVolumeChange(track.id, value)}
+            />
             <VUMeter 
               key={`${track.id}-${isRecording ? 'recording' : 'playback'}`}
               audioNode={vuAudioNode}
