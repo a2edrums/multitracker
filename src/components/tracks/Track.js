@@ -34,7 +34,7 @@ const Track = ({
   return (
     <div className="studio-track">
       <div className="d-flex align-items-stretch p-2">
-        <div className="track-controls d-flex" style={{ minWidth: '200px' }}>
+        <div className="track-controls d-flex" style={{ minWidth: '290px' }}>
           <div className="flex-grow-1">
             <div className="d-flex align-items-center mb-2">
               <Button

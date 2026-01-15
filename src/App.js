@@ -609,7 +609,7 @@ function App() {
           <Col className="d-flex flex-column">
             {/* Timeline Area */}
             <div className="d-flex">
-              <div style={{ minWidth: '268px' }}></div>
+              <div style={{ minWidth: '300px' }}></div>
               <div className="flex-grow-1 ms-3">
                 <Timeline 
                   currentTime={currentTime}
