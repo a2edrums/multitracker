@@ -50,20 +50,38 @@ class AudioEngine {
     }
     
     const trackGain = this.context.createGain();
+    const panNode = this.context.createStereoPanner();
     const eqNode = this.context.createGain();
-    const vuGain = this.context.createGain(); // For VU meter
+    const chorusNode = this.context.createGain();
+    const delayNode = this.context.createGain();
+    const reverbNode = this.context.createGain();
+    const compressorNode = this.context.createGain();
+    const vuGain = this.context.createGain();
     
-    // Create EQ for this track
     const eq = this.effects.createEQ(trackGain, eqNode);
-    eqNode.connect(vuGain);
+    const chorus = this.effects.createChorus(eqNode, chorusNode);
+    const delay = this.effects.createDelay(chorusNode, delayNode);
+    const reverb = this.effects.createReverb(delayNode, reverbNode, 0.5, 0);
+    const compressor = this.effects.createCompressor(reverbNode, compressorNode);
+    compressorNode.connect(panNode);
+    panNode.connect(vuGain);
     vuGain.connect(this.masterGain);
     
     const track = {
       id,
       gainNode: trackGain,
+      panNode,
       eqNode,
-      vuGain, // VU meter tap
+      chorusNode,
+      delayNode,
+      reverbNode,
+      compressorNode,
+      vuGain,
       eq,
+      chorus,
+      delay,
+      reverb,
+      compressor,
       source: null,
       buffer: null,
       volume: 1,
@@ -71,9 +89,25 @@ class AudioEngine {
       muted: false,
       solo: false,
       effects: {
+        eqEnabled: true,
         lowGain: 0,
         midGain: 0,
-        highGain: 0
+        highGain: 0,
+        chorusEnabled: false,
+        chorusDepth: 0.5,
+        chorusRate: 0.5,
+        chorusMix: 0.3,
+        delayEnabled: false,
+        delayTime: 0.5,
+        delayFeedback: 0.3,
+        delayMix: 0.3,
+        reverbEnabled: false,
+        reverbMix: 0.3,
+        compressorEnabled: false,
+        compressorThreshold: -24,
+        compressorRatio: 4,
+        compressorAttack: 0.003,
+        compressorRelease: 0.25
       }
     };
     
@@ -87,8 +121,16 @@ class AudioEngine {
       if (track.source) {
         track.source.disconnect();
       }
+      if (track.chorus?.lfo) {
+        track.chorus.lfo.stop();
+      }
       track.gainNode.disconnect();
+      track.panNode.disconnect();
       track.eqNode.disconnect();
+      track.chorusNode.disconnect();
+      track.delayNode.disconnect();
+      track.reverbNode.disconnect();
+      track.compressorNode.disconnect();
       track.vuGain.disconnect();
       this.tracks.delete(id);
     }
@@ -119,15 +161,112 @@ class AudioEngine {
     const track = this.tracks.get(id);
     if (track && track.eq) {
       track.effects[`${band}Gain`] = gain;
-      switch(band) {
-        case 'low':
-          track.eq.setLowGain(gain);
+      if (band === 'enabled') {
+        track.effects.eqEnabled = gain;
+        if (!gain) {
+          track.eq.setLowGain(0);
+          track.eq.setMidGain(0);
+          track.eq.setHighGain(0);
+        } else {
+          track.eq.setLowGain(track.effects.lowGain);
+          track.eq.setMidGain(track.effects.midGain);
+          track.eq.setHighGain(track.effects.highGain);
+        }
+      } else {
+        switch(band) {
+          case 'low':
+            if (track.effects.eqEnabled) track.eq.setLowGain(gain);
+            break;
+          case 'mid':
+            if (track.effects.eqEnabled) track.eq.setMidGain(gain);
+            break;
+          case 'high':
+            if (track.effects.eqEnabled) track.eq.setHighGain(gain);
+            break;
+          default:
+            break;
+        }
+      }
+    }
+  }
+
+  setTrackChorus(id, param, value) {
+    const track = this.tracks.get(id);
+    if (track && track.chorus) {
+      track.effects[`chorus${param.charAt(0).toUpperCase() + param.slice(1)}`] = value;
+      switch(param) {
+        case 'enabled':
+          track.chorus.setMix(value ? track.effects.chorusMix : 0);
           break;
-        case 'mid':
-          track.eq.setMidGain(gain);
+        case 'depth':
+          track.chorus.setDepth(value);
           break;
-        case 'high':
-          track.eq.setHighGain(gain);
+        case 'rate':
+          track.chorus.setRate(value);
+          break;
+        case 'mix':
+          track.chorus.setMix(track.effects.chorusEnabled ? value : 0);
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  setTrackDelay(id, param, value) {
+    const track = this.tracks.get(id);
+    if (track && track.delay) {
+      track.effects[`delay${param.charAt(0).toUpperCase() + param.slice(1)}`] = value;
+      switch(param) {
+        case 'enabled':
+          track.delay.setMix(value ? track.effects.delayMix : 0);
+          break;
+        case 'time':
+          track.delay.setTime(value);
+          break;
+        case 'feedback':
+          track.delay.setFeedback(value);
+          break;
+        case 'mix':
+          track.delay.setMix(track.effects.delayEnabled ? value : 0);
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  setTrackReverb(id, param, value) {
+    const track = this.tracks.get(id);
+    if (track && track.reverb) {
+      track.effects[`reverb${param.charAt(0).toUpperCase() + param.slice(1)}`] = value;
+      if (param === 'enabled') {
+        track.reverb.setWetness(value ? track.effects.reverbMix : 0);
+      } else if (param === 'mix') {
+        track.reverb.setWetness(track.effects.reverbEnabled ? value : 0);
+      }
+    }
+  }
+
+  setTrackCompressor(id, param, value) {
+    const track = this.tracks.get(id);
+    if (track && track.compressor) {
+      track.effects[`compressor${param.charAt(0).toUpperCase() + param.slice(1)}`] = value;
+      switch(param) {
+        case 'enabled':
+          // Compressor is always in chain, just store state
+          break;
+        case 'threshold':
+          if (track.effects.compressorEnabled) track.compressor.setThreshold(value);
+          break;
+        case 'ratio':
+          if (track.effects.compressorEnabled) track.compressor.setRatio(value);
+          break;
+        case 'attack':
+          if (track.effects.compressorEnabled) track.compressor.setAttack(value);
+          break;
+        case 'release':
+          if (track.effects.compressorEnabled) track.compressor.setRelease(value);
           break;
         default:
           break;

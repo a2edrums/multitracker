@@ -85,6 +85,122 @@ class AudioEffects {
     
     return impulse;
   }
+
+  createChorus(inputNode, outputNode) {
+    const delayNode = this.context.createDelay();
+    const lfo = this.context.createOscillator();
+    const lfoGain = this.context.createGain();
+    const wetGain = this.context.createGain();
+    const dryGain = this.context.createGain();
+    const outputGain = this.context.createGain();
+
+    delayNode.delayTime.value = 0.02;
+    lfo.frequency.value = 0.5;
+    lfoGain.gain.value = 0.005;
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(delayNode.delayTime);
+
+    inputNode.connect(dryGain);
+    inputNode.connect(delayNode);
+    delayNode.connect(wetGain);
+    
+    dryGain.connect(outputGain);
+    wetGain.connect(outputGain);
+    outputGain.connect(outputNode);
+
+    dryGain.gain.setValueAtTime(1, this.context.currentTime);
+    wetGain.gain.setValueAtTime(0, this.context.currentTime);
+
+    lfo.start();
+
+    return {
+      lfo,
+      delayNode,
+      wetGain,
+      dryGain,
+      setDepth: (depth) => {
+        lfoGain.gain.setValueAtTime(depth * 0.01, this.context.currentTime);
+      },
+      setRate: (rate) => {
+        lfo.frequency.setValueAtTime(rate, this.context.currentTime);
+      },
+      setMix: (mix) => {
+        wetGain.gain.setValueAtTime(mix, this.context.currentTime);
+        dryGain.gain.setValueAtTime(1 - mix, this.context.currentTime);
+      }
+    };
+  }
+
+  createDelay(inputNode, outputNode) {
+    const delayNode = this.context.createDelay(2.0);
+    const feedbackGain = this.context.createGain();
+    const wetGain = this.context.createGain();
+    const dryGain = this.context.createGain();
+    const outputGain = this.context.createGain();
+
+    delayNode.delayTime.value = 0.5;
+    feedbackGain.gain.value = 0.3;
+
+    inputNode.connect(dryGain);
+    inputNode.connect(delayNode);
+    delayNode.connect(feedbackGain);
+    feedbackGain.connect(delayNode);
+    delayNode.connect(wetGain);
+    
+    dryGain.connect(outputGain);
+    wetGain.connect(outputGain);
+    outputGain.connect(outputNode);
+
+    dryGain.gain.setValueAtTime(1, this.context.currentTime);
+    wetGain.gain.setValueAtTime(0, this.context.currentTime);
+
+    return {
+      delayNode,
+      feedbackGain,
+      wetGain,
+      dryGain,
+      setTime: (time) => {
+        delayNode.delayTime.setValueAtTime(time, this.context.currentTime);
+      },
+      setFeedback: (feedback) => {
+        feedbackGain.gain.setValueAtTime(feedback, this.context.currentTime);
+      },
+      setMix: (mix) => {
+        wetGain.gain.setValueAtTime(mix, this.context.currentTime);
+        dryGain.gain.setValueAtTime(1 - mix, this.context.currentTime);
+      }
+    };
+  }
+
+  createCompressor(inputNode, outputNode) {
+    const compressor = this.context.createDynamicsCompressor();
+    
+    compressor.threshold.value = -24;
+    compressor.knee.value = 30;
+    compressor.ratio.value = 12;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+
+    inputNode.connect(compressor);
+    compressor.connect(outputNode);
+
+    return {
+      compressor,
+      setThreshold: (threshold) => {
+        compressor.threshold.setValueAtTime(threshold, this.context.currentTime);
+      },
+      setRatio: (ratio) => {
+        compressor.ratio.setValueAtTime(ratio, this.context.currentTime);
+      },
+      setAttack: (attack) => {
+        compressor.attack.setValueAtTime(attack, this.context.currentTime);
+      },
+      setRelease: (release) => {
+        compressor.release.setValueAtTime(release, this.context.currentTime);
+      }
+    };
+  }
 }
 
 export default AudioEffects;

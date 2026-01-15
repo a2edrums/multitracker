@@ -285,6 +285,58 @@ function App() {
     ));
   }, [audioEngine]);
 
+  const handleChorusChange = useCallback((trackId, param, value) => {
+    audioEngine.setTrackChorus(trackId, param, value);
+    setTracks(prev => prev.map(track => 
+      track.id === trackId ? {
+        ...track,
+        effects: {
+          ...track.effects,
+          [`chorus${param.charAt(0).toUpperCase() + param.slice(1)}`]: value
+        }
+      } : track
+    ));
+  }, [audioEngine]);
+
+  const handleDelayChange = useCallback((trackId, param, value) => {
+    audioEngine.setTrackDelay(trackId, param, value);
+    setTracks(prev => prev.map(track => 
+      track.id === trackId ? {
+        ...track,
+        effects: {
+          ...track.effects,
+          [`delay${param.charAt(0).toUpperCase() + param.slice(1)}`]: value
+        }
+      } : track
+    ));
+  }, [audioEngine]);
+
+  const handleReverbChange = useCallback((trackId, param, value) => {
+    audioEngine.setTrackReverb(trackId, param, value);
+    setTracks(prev => prev.map(track => 
+      track.id === trackId ? {
+        ...track,
+        effects: {
+          ...track.effects,
+          [`reverb${param.charAt(0).toUpperCase() + param.slice(1)}`]: value
+        }
+      } : track
+    ));
+  }, [audioEngine]);
+
+  const handleCompressorChange = useCallback((trackId, param, value) => {
+    audioEngine.setTrackCompressor(trackId, param, value);
+    setTracks(prev => prev.map(track => 
+      track.id === trackId ? {
+        ...track,
+        effects: {
+          ...track.effects,
+          [`compressor${param.charAt(0).toUpperCase() + param.slice(1)}`]: value
+        }
+      } : track
+    ));
+  }, [audioEngine]);
+
   const handleZoomIn = useCallback(() => {
     setZoom(prev => Math.min(prev * 2, 8));
   }, []);
@@ -639,6 +691,10 @@ function App() {
                   onDelete={deleteTrack}
                   onRecord={handleTrackArm}
                   onEQChange={handleEQChange}
+                  onChorusChange={handleChorusChange}
+                  onDelayChange={handleDelayChange}
+                  onReverbChange={handleReverbChange}
+                  onCompressorChange={handleCompressorChange}
                   isRecording={isRecording && recordingTrackId === track.id}
                   isArmed={armedTrackId === track.id}
                   currentTime={currentTime}

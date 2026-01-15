@@ -4,6 +4,10 @@ import { FaMicrophone, FaTrash, FaSlidersH } from 'react-icons/fa';
 import WaveformDisplay from './WaveformDisplay.js';
 import VUMeter from '../common/VUMeter.js';
 import EQ from '../effects/EQ.js';
+import Chorus from '../effects/Chorus.js';
+import Delay from '../effects/Delay.js';
+import Reverb from '../effects/Reverb.js';
+import Compressor from '../effects/Compressor.js';
 import VerticalSlider from "./VerticalSlider";
 
 const Track = ({ 
@@ -16,6 +20,10 @@ const Track = ({
   onDelete,
   onRecord,
   onEQChange,
+  onChorusChange,
+  onDelayChange,
+  onReverbChange,
+  onCompressorChange,
   isRecording = false,
   isArmed = false,
   currentTime = 0,
@@ -159,12 +167,52 @@ const Track = ({
       <Collapse in={showEQ}>
         <div>
           <EQ
+            enabled={track.effects?.eqEnabled !== false}
             lowGain={track.effects?.lowGain || 0}
             midGain={track.effects?.midGain || 0}
             highGain={track.effects?.highGain || 0}
+            onEnabledChange={(enabled) => onEQChange(track.id, 'enabled', enabled)}
             onLowChange={(gain) => onEQChange(track.id, 'low', gain)}
             onMidChange={(gain) => onEQChange(track.id, 'mid', gain)}
             onHighChange={(gain) => onEQChange(track.id, 'high', gain)}
+          />
+          <Chorus
+            enabled={track.effects?.chorusEnabled || false}
+            depth={track.effects?.chorusDepth || 0.5}
+            rate={track.effects?.chorusRate || 0.5}
+            mix={track.effects?.chorusMix || 0.3}
+            onEnabledChange={(enabled) => onChorusChange(track.id, 'enabled', enabled)}
+            onDepthChange={(depth) => onChorusChange(track.id, 'depth', depth)}
+            onRateChange={(rate) => onChorusChange(track.id, 'rate', rate)}
+            onMixChange={(mix) => onChorusChange(track.id, 'mix', mix)}
+          />
+          <Delay
+            enabled={track.effects?.delayEnabled || false}
+            time={track.effects?.delayTime || 0.5}
+            feedback={track.effects?.delayFeedback || 0.3}
+            mix={track.effects?.delayMix || 0.3}
+            onEnabledChange={(enabled) => onDelayChange(track.id, 'enabled', enabled)}
+            onTimeChange={(time) => onDelayChange(track.id, 'time', time)}
+            onFeedbackChange={(feedback) => onDelayChange(track.id, 'feedback', feedback)}
+            onMixChange={(mix) => onDelayChange(track.id, 'mix', mix)}
+          />
+          <Reverb
+            enabled={track.effects?.reverbEnabled || false}
+            mix={track.effects?.reverbMix || 0.3}
+            onEnabledChange={(enabled) => onReverbChange(track.id, 'enabled', enabled)}
+            onMixChange={(mix) => onReverbChange(track.id, 'mix', mix)}
+          />
+          <Compressor
+            enabled={track.effects?.compressorEnabled || false}
+            threshold={track.effects?.compressorThreshold || -24}
+            ratio={track.effects?.compressorRatio || 4}
+            attack={track.effects?.compressorAttack || 0.003}
+            release={track.effects?.compressorRelease || 0.25}
+            onEnabledChange={(enabled) => onCompressorChange(track.id, 'enabled', enabled)}
+            onThresholdChange={(threshold) => onCompressorChange(track.id, 'threshold', threshold)}
+            onRatioChange={(ratio) => onCompressorChange(track.id, 'ratio', ratio)}
+            onAttackChange={(attack) => onCompressorChange(track.id, 'attack', attack)}
+            onReleaseChange={(release) => onCompressorChange(track.id, 'release', release)}
           />
         </div>
       </Collapse>
