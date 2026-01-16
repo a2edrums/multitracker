@@ -119,8 +119,11 @@ const Track = ({
           
           <div className="vu-meter ms-2 d-flex">
             <VerticalSlider
-              volume={track.volume || 1}
-              setComponentVolume={(value) => onVolumeChange(track.id, value)}
+              value={track.volume || 1}
+              onChange={(value) => onVolumeChange(track.id, value)}
+              min={0}
+              max={1}
+              step={0.01}
             />
             <VUMeter 
               key={`${track.id}-${isRecording ? 'recording' : 'playback'}`}
@@ -164,8 +167,8 @@ const Track = ({
         </div>
       </div>
       
-      <Collapse in={showEQ}>
-        <div>
+      <Collapse in={showEQ} unmountOnExit>
+        <div className="d-flex gap-3 p-2 bg-dark border-top">
           <EQ
             enabled={track.effects?.eqEnabled !== false}
             lowGain={track.effects?.lowGain || 0}

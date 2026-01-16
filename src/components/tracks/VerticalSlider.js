@@ -2,62 +2,36 @@ import './VerticalSlider.css';
 import {Component} from "react";
 import PropTypes from "prop-types";
 
-// This component will be used to control the volume of the audio
-// It will be a vertical slider that will control the volume of the audio
-// It will be used in the MixerBoard component
-// Bottom is lowest volume and top is highest volume
-
 class VerticalSlider extends Component {
   static propTypes = {
-    volume: PropTypes.number,
-    setComponentVolume: PropTypes.func,
+    value: PropTypes.number,
+    onChange: PropTypes.func,
+    min: PropTypes.number,
+    max: PropTypes.number,
+    step: PropTypes.number,
+    disabled: PropTypes.bool,
+  }
+
+  static defaultProps = {
+    min: 0,
+    max: 1,
+    step: 0.01,
+    disabled: false,
   }
 
   constructor(props) {
     super(props);
-
-    this.state = {
-      muteButtonClassName: this.props.mute ? 'd-none' : '',
-      muteOffButtonClassName: this.props.mute ? '' : 'd-none',
-    };
-    
-    this.timeoutIdForVolume = null;
-    this.timeoutIdForPan = null;
-
-    this.handleMuteClick = this.handleMuteClick.bind(this);
-    this.handlePanChange = this.handlePanChange.bind(this);
+    this.timeoutId = null;
     this.handleSliderChange = this.handleSliderChange.bind(this);
   }
 
-  componentDidUpdate(prevProps, prevState, snapshot) {
-    if (this.props.mute !== prevProps.mute) {
-      this.setState({
-        muteButtonClassName: this.props.mute ? 'd-none' : '',
-        muteOffButtonClassName: this.props.mute ? '' : 'd-none',
-      });
-    }
-  }
-
   handleSliderChange(event) {
-    if(this.timeoutIdForVolume) {
-      clearTimeout(this.timeoutIdForVolume);
+    if(this.timeoutId) {
+      clearTimeout(this.timeoutId);
     }
-    this.timeoutIdForVolume = setTimeout(() => {
-      this.props.setComponentVolume(parseFloat(event.target.value));
-    }, 400);
-  }
-
-  handlePanChange(event) {
-    if(this.timeoutIdForPan) {
-      clearTimeout(this.timeoutIdForPan);
-    }
-    this.timeoutIdForPan = setTimeout(() => {
-      this.props.setComponentPan(this.props.component, parseInt(event.target.value,10) / 100.0);
-    }, 400);
-  }
-
-  handleMuteClick() {
-    this.props.setComponentMute(this.props.component);
+    this.timeoutId = setTimeout(() => {
+      this.props.onChange(parseFloat(event.target.value));
+    }, 50);
   }
 
   render() {
@@ -65,12 +39,12 @@ class VerticalSlider extends Component {
       <div className="vertical-slider">
         <input
             type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            defaultValue={this.props.volume}
+            min={this.props.min}
+            max={this.props.max}
+            step={this.props.step}
+            value={this.props.value}
+            disabled={this.props.disabled}
             className="vertical-slider"
-            id={this.props.component}
             onChange={this.handleSliderChange}
         />
       </div>
