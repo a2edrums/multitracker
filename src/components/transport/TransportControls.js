@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, ButtonGroup } from 'react-bootstrap';
-import { FaPlay, FaPause, FaStop, FaCircle } from 'react-icons/fa';
+import { FaPlay, FaPause, FaStop, FaCircle, FaHeadphones } from 'react-icons/fa';
 import { formatTime } from '../../utils/timeUtils.js';
 import Metronome from './Metronome.js';
 
@@ -12,6 +12,8 @@ const TransportControls = ({
   onStop, 
   onRecord,
   isRecording = false,
+  isMonitoring = false,
+  onMonitorToggle,
   // Metronome props
   bpm = 120,
   isMetronomeOn = false,
@@ -21,6 +23,14 @@ const TransportControls = ({
   return (
     <div className="studio-transport d-flex align-items-center justify-content-between">
       <ButtonGroup>
+        <Button
+          variant={isMonitoring ? 'success' : 'outline-light'}
+          className="studio-button"
+          onClick={onMonitorToggle}
+        >
+          <FaHeadphones />
+        </Button>
+        
         <Button
           variant="outline-light"
           className="studio-button btn-record"

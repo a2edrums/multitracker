@@ -20,7 +20,7 @@ import './styles/theme.css';
 function App() {
   const { isInitialized, needsUserActivation, initializeAudio, isPlaying, currentTime, play, pause, stop, audioEngine } = useAudioContext();
   const { isReady, db } = useIndexedDB();
-  const { isRecording, startRecording, stopRecording, convertBlobToAudioBuffer, recordedBlob, inputNode, recordingBuffer, setRecordedBlob } = useAudioRecording(audioEngine.context);
+  const { isRecording, startRecording, stopRecording, convertBlobToAudioBuffer, recordedBlob, inputNode, recordingBuffer, isMonitoring, startMonitoring, stopMonitoring, setRecordedBlob } = useAudioRecording(audioEngine.context);
   const { isMetronomeOn, bpm, setBpm, toggleMetronome } = useMetronome(audioEngine.context);
   const [tracks, setTracks] = useState([]);
   const [recordingTrackId, setRecordingTrackId] = useState(null);
@@ -348,6 +348,18 @@ function App() {
   const handleTrackArm = useCallback((trackId) => {
     setArmedTrackId(prev => prev === trackId ? null : trackId);
   }, []);
+
+  const handleMonitorToggle = useCallback(async () => {
+    if (!isInitialized) {
+      await initializeAudio();
+    }
+    
+    if (isMonitoring) {
+      stopMonitoring();
+    } else {
+      await startMonitoring();
+    }
+  }, [isMonitoring, startMonitoring, stopMonitoring, isInitialized, initializeAudio]);
 
   const handleStop = useCallback(() => {
     if (isRecording) {
@@ -725,6 +737,8 @@ function App() {
           onStop={handleStop}
           onRecord={handleRecord}
           isRecording={isRecording}
+          isMonitoring={isMonitoring}
+          onMonitorToggle={handleMonitorToggle}
           bpm={bpm}
           isMetronomeOn={isMetronomeOn}
           onMetronomeToggle={toggleMetronome}
