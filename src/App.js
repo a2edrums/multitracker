@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useAudioContext } from './hooks/useAudioContext.js';
 import { useIndexedDB } from './hooks/useIndexedDB.js';
 import { useAudioRecording } from './hooks/useAudioRecording.js';
+import { useAudioDevices } from './hooks/useAudioDevices.js';
 import { useMetronome } from './hooks/useMetronome.js';
 import TransportControls from './components/transport/TransportControls.js';
 import Timeline from './components/transport/Timeline.js';
@@ -13,6 +14,7 @@ import Track from './components/tracks/Track.js';
 import VUMeter from './components/common/VUMeter.js';
 import SpectrumAnalyzer from './components/common/SpectrumAnalyzer.js';
 import FileService from './services/FileService.js';
+import { RECORDING_CONFIG } from './utils/constants.js';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles/theme.css';
@@ -20,11 +22,12 @@ import './styles/theme.css';
 function App() {
   const { isInitialized, needsUserActivation, initializeAudio, isPlaying, currentTime, play, pause, stop, audioEngine } = useAudioContext();
   const { isReady, db } = useIndexedDB();
-  const { isRecording, startRecording, stopRecording, convertBlobToAudioBuffer, recordedBlob, inputNode, recordingBuffer, isMonitoring, startMonitoring, stopMonitoring, setRecordedBlob } = useAudioRecording(audioEngine.context);
+  const { isRecording, startRecording, stopRecording, convertBlobToAudioBuffer, recordingBuffer, isMonitoring, startMonitoring, stopMonitoring, getRecordingNodeForTrack } = useAudioRecording(audioEngine.context);
   const { isMetronomeOn, bpm, setBpm, toggleMetronome } = useMetronome(audioEngine.context);
+  const { devices } = useAudioDevices();
   const [tracks, setTracks] = useState([]);
   const [recordingTrackId, setRecordingTrackId] = useState(null);
-  const [armedTrackId, setArmedTrackId] = useState(null);
+  const [recordingError, setRecordingError] = useState(null);
   const [projectDuration, setProjectDuration] = useState(60);
   const [currentProjectId, setCurrentProjectId] = useState(null);
   const [currentProjectName, setCurrentProjectName] = useState('');
@@ -52,7 +55,6 @@ function App() {
             bpm,
             isMetronomeOn,
             projectDuration,
-            armedTrackId,
             recordingTrackId
           },
           created: existingProject?.created || Date.now(),
@@ -61,7 +63,7 @@ function App() {
         db.saveProject(projectData);
       });
     }
-  }, [tracks, zoom, masterVolume, bpm, isMetronomeOn, projectDuration, armedTrackId, recordingTrackId, currentProjectName, isReady, db, currentProjectId]);
+  }, [tracks, zoom, masterVolume, bpm, isMetronomeOn, projectDuration, recordingTrackId, currentProjectName, isReady, db, currentProjectId]);
 
   // Load last project on startup
   React.useEffect(() => {
@@ -94,7 +96,6 @@ function App() {
             setMasterVolume(project.settings.masterVolume || 1);
             setBpm(project.settings.bpm || 120);
             setProjectDuration(project.settings.projectDuration || 60);
-            setArmedTrackId(project.settings.armedTrackId || null);
             setRecordingTrackId(project.settings.recordingTrackId || null);
             
             // Apply master volume to audio engine
@@ -206,9 +207,14 @@ function App() {
       id: trackId,
       name: `Track ${tracks.length + 1}`,
       volume: 1,
+      pan: 0,
       muted: false,
       solo: false,
       buffer: null,
+      hasAudio: false,
+      isArmed: false,
+      inputDeviceId: null,
+      channelAssignment: RECORDING_CONFIG.DEFAULT_CHANNEL_ASSIGNMENT,
       effects: {
         lowGain: 0,
         midGain: 0,
@@ -346,8 +352,46 @@ function App() {
   }, []);
 
   const handleTrackArm = useCallback((trackId) => {
-    setArmedTrackId(prev => prev === trackId ? null : trackId);
+    setTracks(prev => {
+      const track = prev.find(t => t.id === trackId);
+      if (!track) return prev;
+
+      // If already armed, disarm it
+      if (track.isArmed) {
+        setRecordingError(null);
+        return prev.map(t => t.id === trackId ? { ...t, isArmed: false } : t);
+      }
+
+      // Check max armed limit
+      const armedCount = prev.filter(t => t.isArmed).length;
+      if (armedCount >= RECORDING_CONFIG.MAX_ARMED_TRACKS) {
+        setRecordingError(`Maximum ${RECORDING_CONFIG.MAX_ARMED_TRACKS} tracks can be armed simultaneously.`);
+        return prev;
+      }
+
+      setRecordingError(null);
+      return prev.map(t => t.id === trackId ? { ...t, isArmed: true } : t);
+    });
   }, []);
+
+  const handleInputDeviceChange = useCallback((trackId, deviceId) => {
+    setTracks(prev => prev.map(t =>
+      t.id === trackId ? { ...t, inputDeviceId: deviceId } : t
+    ));
+  }, []);
+
+  const handleChannelAssignmentChange = useCallback((trackId, assignment) => {
+    setTracks(prev => prev.map(t =>
+      t.id === trackId ? { ...t, channelAssignment: assignment } : t
+    ));
+  }, []);
+
+  const handlePanChange = useCallback((trackId, value) => {
+    audioEngine.setTrackPan(trackId, value);
+    setTracks(prev => prev.map(t =>
+      t.id === trackId ? { ...t, pan: value } : t
+    ));
+  }, [audioEngine]);
 
   const handleMonitorToggle = useCallback(async () => {
     if (!isInitialized) {
@@ -361,13 +405,29 @@ function App() {
     }
   }, [isMonitoring, startMonitoring, stopMonitoring, isInitialized, initializeAudio]);
 
-  const handleStop = useCallback(() => {
+  const handleStop = useCallback(async () => {
     if (isRecording) {
-      stopRecording();
-      // Don't clear recordingTrackId here - let the audio processing useEffect handle it
+      const bufferMap = await stopRecording();
+      // Process recorded buffers on stop as well
+      if (bufferMap && bufferMap.size > 0) {
+        for (const [trackId, buffer] of bufferMap) {
+          const engineTrack = audioEngine.tracks.get(trackId);
+          if (engineTrack) {
+            engineTrack.buffer = buffer;
+            const channelData = buffer.getChannelData(0);
+            const blob = new Blob([channelData.buffer], { type: 'audio/wav' });
+            await db.saveAudioBlob(trackId, blob);
+          }
+        }
+        setTracks(prev => prev.map(t => {
+          const buf = bufferMap.get(t.id);
+          return buf ? { ...t, buffer: buf, hasAudio: true } : t;
+        }));
+      }
+      setRecordingTrackId(null);
     }
     stop();
-  }, [isRecording, stopRecording, stop]);
+  }, [isRecording, stopRecording, stop, audioEngine, db]);
 
   const handleRecord = useCallback(async () => {
     if (!isInitialized) {
@@ -375,78 +435,93 @@ function App() {
     }
     
     if (isRecording) {
-      stopRecording();
-    } else {
-      if (armedTrackId) {
-        const success = await startRecording();
-        if (success) {
-          setRecordingTrackId(armedTrackId);
-          play();
-        } else {
-          console.error('Failed to start recording');
+      const bufferMap = await stopRecording();
+      // Process Map<trackId, AudioBuffer> — assign mono buffers to each track
+      if (bufferMap && bufferMap.size > 0) {
+        for (const [trackId, buffer] of bufferMap) {
+          const engineTrack = audioEngine.tracks.get(trackId);
+          if (engineTrack) {
+            engineTrack.buffer = buffer;
+            // Save audio blob to IndexedDB
+            const channelData = buffer.getChannelData(0);
+            const blob = new Blob([channelData.buffer], { type: 'audio/wav' });
+            await db.saveAudioBlob(trackId, blob);
+          }
         }
+        setTracks(prev => prev.map(t => {
+          const buf = bufferMap.get(t.id);
+          return buf ? { ...t, buffer: buf, hasAudio: true } : t;
+        }));
+      }
+      setRecordingTrackId(null);
+    } else {
+      // Get armed tracks
+      const armedTracks = tracks.filter(t => t.isArmed);
+      if (armedTracks.length === 0) {
+        setRecordingError('Arm at least one track to record');
+        return;
+      }
+
+      // Build descriptors for the recording engine
+      const descriptors = armedTracks.map(t => ({
+        id: t.id,
+        inputDeviceId: t.inputDeviceId,
+        channelAssignment: t.channelAssignment
+      }));
+
+      const success = await startRecording(descriptors);
+      if (success) {
+        setRecordingTrackId('multi');
+        setRecordingError(null);
+        play();
+      } else {
+        setRecordingError('Failed to start recording');
       }
     }
-  }, [isRecording, startRecording, stopRecording, isInitialized, initializeAudio, armedTrackId, play]);
-
-  // Handle recorded audio
-  React.useEffect(() => {
-    if (recordedBlob && recordingTrackId) {
-      convertBlobToAudioBuffer(recordedBlob).then(async audioBuffer => {
-        if (audioBuffer) {
-          const correctBuffer = audioEngine.context.createBuffer(
-            audioBuffer.numberOfChannels,
-            audioBuffer.length,
-            audioBuffer.sampleRate
-          );
-          for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-            correctBuffer.copyToChannel(audioBuffer.getChannelData(channel), channel);
-          }
-          
-          const track = audioEngine.tracks.get(recordingTrackId);
-          if (track) {
-            track.buffer = correctBuffer;
-            await db.saveAudioBlob(recordingTrackId, recordedBlob);
-            setTracks(prev => prev.map(t => 
-              t.id === recordingTrackId ? { ...t, buffer: correctBuffer, hasAudio: true } : t
-            ));
-          } else {
-            console.error('Track not found in audio engine:', recordingTrackId);
-          }
-        } else {
-          console.error('Failed to create audio buffer from blob');
-        }
-        setRecordedBlob(null);
-        setRecordingTrackId(null);
-      }).catch(error => {
-        console.error('Error processing recorded audio:', error);
-        setRecordedBlob(null);
-        setRecordingTrackId(null);
-      });
-    }
-  }, [recordedBlob, recordingTrackId, audioEngine, convertBlobToAudioBuffer, db, setRecordedBlob]);
+  }, [isRecording, startRecording, stopRecording, isInitialized, initializeAudio, tracks, play, audioEngine, db]);
 
   const handleFileImport = useCallback(() => {
     const input = FileService.createFileInput(async (file) => {
       try {
-        const audioBuffer = await FileService.importAudioFile(file, audioEngine.context);
-        const trackId = uuidv4();
-        const newTrack = {
-          id: trackId,
-          name: file.name.replace(/\.[^/.]+$/, ""),
-          volume: 1,
-          muted: false,
-          solo: false,
-          buffer: audioBuffer,
-          hasAudio: true
-        };
-        
-        const engineTrack = audioEngine.createTrack(trackId);
-        engineTrack.buffer = audioBuffer;
-        // Save imported audio to IndexedDB
-        const blob = new Blob([await audioBuffer.getChannelData(0).buffer], { type: 'audio/wav' });
-        await db.saveAudioBlob(trackId, blob);
-        setTracks(prev => [...prev, newTrack]);
+        const trackDescriptors = await FileService.importAudioFile(file, audioEngine.context);
+        const baseName = file.name.replace(/\.[^/.]+$/, "");
+
+        const newTracks = [];
+        for (const descriptor of trackDescriptors) {
+          const trackId = uuidv4();
+          const trackName = `${baseName}${descriptor.nameSuffix || ''}`;
+          const newTrack = {
+            id: trackId,
+            name: trackName,
+            volume: 1,
+            pan: descriptor.pan,
+            muted: false,
+            solo: false,
+            buffer: descriptor.buffer,
+            hasAudio: true,
+            isArmed: false,
+            inputDeviceId: null,
+            channelAssignment: RECORDING_CONFIG.DEFAULT_CHANNEL_ASSIGNMENT,
+            effects: {
+              lowGain: 0,
+              midGain: 0,
+              highGain: 0
+            }
+          };
+
+          const engineTrack = audioEngine.createTrack(trackId);
+          engineTrack.buffer = descriptor.buffer;
+          audioEngine.setTrackPan(trackId, descriptor.pan);
+
+          // Save imported audio to IndexedDB
+          const channelData = descriptor.buffer.getChannelData(0);
+          const blob = new Blob([channelData.buffer], { type: 'audio/wav' });
+          await db.saveAudioBlob(trackId, blob);
+
+          newTracks.push(newTrack);
+        }
+
+        setTracks(prev => [...prev, ...newTracks]);
       } catch (error) {
         alert(`Failed to import file: ${error.message}`);
       }
@@ -496,7 +571,6 @@ function App() {
         bpm: 120,
         isMetronomeOn: false,
         projectDuration: 60,
-        armedTrackId: null,
         recordingTrackId: null
       },
       created: Date.now(),
@@ -513,7 +587,6 @@ function App() {
     setMasterVolume(1);
     setBpm(120);
     setProjectDuration(60);
-    setArmedTrackId(null);
     setRecordingTrackId(null);
     setNewProjectName('');
     setShowProjectSelector(false);
@@ -697,24 +770,30 @@ function App() {
                   key={track.id}
                   track={track}
                   onVolumeChange={handleTrackVolumeChange}
+                  onPanChange={handlePanChange}
                   onNameChange={handleTrackNameChange}
                   onMute={handleMute}
                   onSolo={handleSolo}
                   onDelete={deleteTrack}
-                  onRecord={handleTrackArm}
+                  onArm={handleTrackArm}
                   onEQChange={handleEQChange}
                   onChorusChange={handleChorusChange}
                   onDelayChange={handleDelayChange}
                   onReverbChange={handleReverbChange}
                   onCompressorChange={handleCompressorChange}
-                  isRecording={isRecording && recordingTrackId === track.id}
-                  isArmed={armedTrackId === track.id}
+                  isRecording={isRecording && track.isArmed}
+                  isArmed={track.isArmed}
                   currentTime={currentTime}
                   audioEngine={audioEngine}
-                  inputNode={isRecording && recordingTrackId === track.id ? inputNode : null}
-                  recordingBuffer={isRecording && recordingTrackId === track.id ? recordingBuffer : null}
+                  inputNode={isRecording && track.isArmed ? getRecordingNodeForTrack(track.id) : null}
+                  recordingBuffer={isRecording && track.isArmed ? recordingBuffer : null}
                   zoom={zoom}
                   projectDuration={projectDuration}
+                  availableDevices={devices}
+                  inputDeviceId={track.inputDeviceId}
+                  channelAssignment={track.channelAssignment}
+                  onInputDeviceChange={handleInputDeviceChange}
+                  onChannelAssignmentChange={handleChannelAssignmentChange}
                 />
               ))}
               
@@ -739,6 +818,8 @@ function App() {
           isRecording={isRecording}
           isMonitoring={isMonitoring}
           onMonitorToggle={handleMonitorToggle}
+          armedTrackCount={tracks.filter(t => t.isArmed).length}
+          onRecordError={setRecordingError}
           bpm={bpm}
           isMetronomeOn={isMetronomeOn}
           onMetronomeToggle={toggleMetronome}

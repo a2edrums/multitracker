@@ -88,6 +88,8 @@ class AudioEngine {
       pan: 0,
       muted: false,
       solo: false,
+      inputDeviceId: null,
+      channelAssignment: 'mono',
       effects: {
         eqEnabled: true,
         lowGain: 0,
@@ -113,6 +115,29 @@ class AudioEngine {
     
     this.tracks.set(id, track);
     return track;
+  }
+  splitStereoToMonoPair(audioBuffer) {
+    const length = audioBuffer.length;
+    const sampleRate = audioBuffer.sampleRate;
+    const leftBuffer = this.context.createBuffer(1, length, sampleRate);
+    const rightBuffer = this.context.createBuffer(1, length, sampleRate);
+    leftBuffer.getChannelData(0).set(audioBuffer.getChannelData(0));
+    rightBuffer.getChannelData(0).set(audioBuffer.getChannelData(1));
+    return [leftBuffer, rightBuffer];
+  }
+  downmixToMono(audioBuffer) {
+    if (audioBuffer.numberOfChannels === 1) return audioBuffer;
+    const length = audioBuffer.length;
+    const monoBuffer = this.context.createBuffer(1, length, audioBuffer.sampleRate);
+    const output = monoBuffer.getChannelData(0);
+    const numChannels = audioBuffer.numberOfChannels;
+    for (let ch = 0; ch < numChannels; ch++) {
+      const channelData = audioBuffer.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        output[i] += channelData[i] / numChannels;
+      }
+    }
+    return monoBuffer;
   }
 
   removeTrack(id) {
@@ -141,6 +166,13 @@ class AudioEngine {
     if (track) {
       track.volume = volume;
       this.updateTrackGain(track);
+    }
+  }
+  setTrackPan(id, value) {
+    const track = this.tracks.get(id);
+    if (track) {
+      track.pan = value;
+      track.panNode.pan.setValueAtTime(value, this.context.currentTime);
     }
   }
 

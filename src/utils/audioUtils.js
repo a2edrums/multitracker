@@ -1,5 +1,5 @@
 export const createAudioBuffer = (audioContext, length, sampleRate = 44100) => {
-  return audioContext.createBuffer(2, length, sampleRate);
+  return audioContext.createBuffer(1, length, sampleRate);
 };
 
 export const decodeAudioFile = async (audioContext, arrayBuffer) => {

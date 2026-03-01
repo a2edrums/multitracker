@@ -1,21 +1,32 @@
+import audioEngine from './AudioEngine.js';
 class FileService {
   constructor() {
     this.supportedFormats = ['audio/wav', 'audio/mp3', 'audio/ogg', 'audio/webm'];
   }
 
   async importAudioFile(file, audioContext) {
-    if (!this.isValidAudioFile(file)) {
-      throw new Error('Unsupported file format');
-    }
+      if (!this.isValidAudioFile(file)) {
+        throw new Error('Unsupported file format');
+      }
 
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      return audioBuffer;
-    } catch (error) {
-      throw new Error(`Failed to import audio file: ${error.message}`);
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const decoded = await audioContext.decodeAudioData(arrayBuffer);
+        if (decoded.numberOfChannels === 2) {
+          const [left, right] = audioEngine.splitStereoToMonoPair(decoded);
+          return [
+            { buffer: left, pan: -1, nameSuffix: ' (L)' },
+            { buffer: right, pan: 1, nameSuffix: ' (R)' },
+          ];
+        }
+        const mono = decoded.numberOfChannels === 1
+          ? decoded
+          : audioEngine.downmixToMono(decoded);
+        return [{ buffer: mono, pan: 0, nameSuffix: '' }];
+      } catch (error) {
+        throw new Error(`Failed to import audio file: ${error.message}`);
+      }
     }
-  }
 
   isValidAudioFile(file) {
     return this.supportedFormats.some(format => 
@@ -24,30 +35,32 @@ class FileService {
   }
 
   mixTracks(tracks, audioContext, duration) {
-    const sampleRate = audioContext.sampleRate;
-    const length = Math.ceil(duration * sampleRate);
-    const mixedBuffer = audioContext.createBuffer(2, length, sampleRate);
-    const leftChannel = mixedBuffer.getChannelData(0);
-    const rightChannel = mixedBuffer.getChannelData(1);
+      const sampleRate = audioContext.sampleRate;
+      const length = Math.ceil(duration * sampleRate);
+      const mixedBuffer = audioContext.createBuffer(2, length, sampleRate);
+      const leftChannel = mixedBuffer.getChannelData(0);
+      const rightChannel = mixedBuffer.getChannelData(1);
 
-    tracks.forEach(track => {
-      if (track.buffer && !track.muted) {
-        const hasSolo = tracks.some(t => t.solo);
-        if (hasSolo && !track.solo) return;
+      tracks.forEach(track => {
+        if (track.buffer && !track.muted) {
+          const hasSolo = tracks.some(t => t.solo);
+          if (hasSolo && !track.solo) return;
 
-        const volume = track.volume || 1;
-        const sourceLeft = track.buffer.getChannelData(0);
-        const sourceRight = track.buffer.numberOfChannels > 1 ? track.buffer.getChannelData(1) : sourceLeft;
+          const volume = track.volume || 1;
+          const pan = track.pan || 0;
+          const leftGain = Math.cos((pan + 1) * Math.PI / 4);
+          const rightGain = Math.sin((pan + 1) * Math.PI / 4);
+          const source = track.buffer.getChannelData(0); // always mono now
 
-        for (let i = 0; i < Math.min(track.buffer.length, length); i++) {
-          leftChannel[i] += sourceLeft[i] * volume;
-          rightChannel[i] += sourceRight[i] * volume;
+          for (let i = 0; i < Math.min(track.buffer.length, length); i++) {
+            leftChannel[i] += source[i] * volume * leftGain;
+            rightChannel[i] += source[i] * volume * rightGain;
+          }
         }
-      }
-    });
+      });
 
-    return mixedBuffer;
-  }
+      return mixedBuffer;
+    }
 
   async exportAudioBuffer(audioBuffer, filename = 'export.wav') {
     try {

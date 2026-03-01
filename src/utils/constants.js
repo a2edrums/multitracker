@@ -20,3 +20,9 @@ export const KEYBOARD_SHORTCUTS = {
   UNDO: 'z',
   REDO: 'y'
 };
+export const RECORDING_CONFIG = {
+  MAX_ARMED_TRACKS: 2,
+  DEFAULT_CHANNEL_ASSIGNMENT: 'mono',
+  DEVICE_POLL_INTERVAL: 2000
+};
+

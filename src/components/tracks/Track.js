@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Form, Collapse } from 'react-bootstrap';
-import { FaMicrophone, FaTrash, FaSlidersH } from 'react-icons/fa';
+import { FaMicrophone, FaTrash, FaSlidersH, FaExclamationTriangle } from 'react-icons/fa';
 import WaveformDisplay from './WaveformDisplay.js';
 import VUMeter from '../common/VUMeter.js';
 import EQ from '../effects/EQ.js';
@@ -19,6 +19,7 @@ const Track = ({
   onSolo, 
   onDelete,
   onRecord,
+  onArm,
   onEQChange,
   onChorusChange,
   onDelayChange,
@@ -31,10 +32,18 @@ const Track = ({
   inputNode,
   recordingBuffer,
   zoom = 1,
-  projectDuration = 60
+  projectDuration = 60,
+  availableDevices = [],
+  inputDeviceId = null,
+  channelAssignment = 'mono',
+  onInputDeviceChange,
+  onChannelAssignmentChange
 }) => {
   const [showEQ, setShowEQ] = useState(false);
-  
+
+  const isDeviceUnavailable = inputDeviceId && availableDevices.length > 0 &&
+    !availableDevices.some(d => d.deviceId === inputDeviceId);
+
   const vuAudioNode = React.useMemo(() => {
     return inputNode || audioEngine?.tracks?.get(track.id)?.vuGain;
   }, [inputNode, audioEngine, track.id]);
@@ -46,12 +55,14 @@ const Track = ({
           <div className="flex-grow-1">
             <div className="d-flex align-items-center mb-2">
               <Button
-                variant={isArmed ? 'danger' : isRecording ? 'danger' : 'outline-danger'}
+                variant={isArmed ? 'danger' : 'outline-danger'}
                 size="sm"
                 className="me-2"
-                onClick={() => onRecord(track.id)}
+                onClick={() => onArm ? onArm(track.id) : onRecord && onRecord(track.id)}
+                style={isArmed ? { boxShadow: '0 0 8px rgba(220, 53, 69, 0.6)' } : {}}
+                title={isArmed ? 'Disarm track' : 'Arm track for recording'}
               >
-                <FaMicrophone className={isArmed || isRecording ? 'text-white' : ''} />
+                <FaMicrophone className={isArmed ? 'text-white' : ''} />
               </Button>
               
               <div className="track-name flex-grow-1">
@@ -67,6 +78,41 @@ const Track = ({
                     }
                   }}
                 />
+              </div>
+            </div>
+            
+            <div className="d-flex align-items-center mb-2 gap-1">
+              <div className="d-flex align-items-center flex-grow-1">
+                {isDeviceUnavailable && (
+                  <FaExclamationTriangle className="text-warning me-1" title="Selected device is unavailable" />
+                )}
+                <Form.Select
+                  size="sm"
+                  className="bg-dark text-light border-secondary"
+                  value={inputDeviceId || ''}
+                  onChange={(e) => onInputDeviceChange && onInputDeviceChange(track.id, e.target.value || null)}
+                  style={{ fontSize: '0.75rem' }}
+                >
+                  <option value="">Default Input</option>
+                  {availableDevices.map((device) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Input ${device.deviceId.slice(0, 8)}`}
+                    </option>
+                  ))}
+                </Form.Select>
+              </div>
+              <div className="btn-group btn-group-sm" role="group" aria-label="Channel assignment">
+                {['mono', 'left', 'right'].map((assignment) => (
+                  <Button
+                    key={assignment}
+                    variant={channelAssignment === assignment ? 'primary' : 'outline-secondary'}
+                    size="sm"
+                    onClick={() => onChannelAssignmentChange && onChannelAssignmentChange(track.id, assignment)}
+                    style={{ fontSize: '0.65rem', padding: '0.15rem 0.35rem' }}
+                  >
+                    {assignment === 'mono' ? 'M' : assignment === 'left' ? 'L' : 'R'}
+                  </Button>
+                ))}
               </div>
             </div>
             
